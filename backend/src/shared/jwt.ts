@@ -1,0 +1,43 @@
+import jwt from 'jsonwebtoken';
+import { config } from '../config/index.js';
+
+export interface TokenPayload {
+  userId: string;
+  email: string;
+  role: string;
+}
+
+export interface RefreshTokenPayload {
+  userId: string;
+  tokenId: string;
+}
+
+export function signAccessToken(payload: TokenPayload): string {
+  return jwt.sign(payload, config.jwt.secret, {
+    expiresIn: config.jwt.accessExpiry as any,
+    issuer: 'bloodbridge-api',
+    audience: 'bloodbridge-app',
+  });
+}
+
+export function signRefreshToken(payload: RefreshTokenPayload): string {
+  return jwt.sign(payload, config.jwt.secret, {
+    expiresIn: config.jwt.refreshExpiry as any,
+    issuer: 'bloodbridge-api',
+    audience: 'bloodbridge-refresh',
+  });
+}
+
+export function verifyAccessToken(token: string): TokenPayload {
+  return jwt.verify(token, config.jwt.secret, {
+    issuer: 'bloodbridge-api',
+    audience: 'bloodbridge-app',
+  }) as TokenPayload;
+}
+
+export function verifyRefreshToken(token: string): RefreshTokenPayload {
+  return jwt.verify(token, config.jwt.secret, {
+    issuer: 'bloodbridge-api',
+    audience: 'bloodbridge-refresh',
+  }) as RefreshTokenPayload;
+}

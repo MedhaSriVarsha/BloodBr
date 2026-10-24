@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  fullName        String
+  email           String    @unique
+  phone           String?   @unique
+  passwordHash    String?
+  role            String    @default("donor") // "donor", "admin", "coordinator"
+  status          String    @default("active") // "active", "suspended", "pending"
+  isEmailVerified Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  donorProfile       DonorProfile?
+  oauthAccounts      OAuthAccount[]
+  refreshTokens      RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  createdReferrals   Referral[]         @relation("ReferrerUsers")
+  receivedReferral   Referral?          @relation("ReferredUser")
+  consentRecords     ConsentRecord[]
+  notifications      Notification[]     @relation("UserNotifications")
+  supportTickets     SupportTicket[]
+  auditLogs          AuditLog[]         @relation("UserAuditLogs")
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+model DonorProfile {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  bloodGroup          String    // A+, A-, B+, B-, AB+, AB-, O+, O-
+  state               String
+  district            String
+  city                String
+  isAvailable         Boolean   @default(true)
+  donationWillingness String    @default("regular") // "regular", "emergency_only", "occasional"
+  totalDonations      Int       @default(0)
+  lastDonationDate    DateTime?
+  isProfileCompleted  Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([bloodGroup])
+  @@index([city])
+  @@index([state, district])
+  @@index([isAvailable])
+}
+
+model OAuthAccount {
+  id                String   @id @default(uuid())
+  userId            String
+  provider          String   // "google"
+  providerSubjectId String   // Google sub ID
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubjectId])
+  @@index([userId])
+}
+
+model EmailOtpChallenge {
+  id           String    @id @default(uuid())
+  email        String
+  userId       String?
+  hashedOtp    String
+  purpose      String    // "registration", "login", "password_reset", "contact_verification"
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  verifiedAt   DateTime?
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([email, purpose])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  userAgent String?
+  ipAddress String?
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Referral {
+  id             String    @id @default(uuid())
+  referrerUserId String
+  referralCode   String    @unique
+  referredUserId String?   @unique
+  status         String    @default("active") // "active", "completed", "expired", "revoked"
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  referrer User  @relation("ReferrerUsers", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referred User? @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: SetNull)
+
+  @@index([referrerUserId])
+  @@index([referralCode])
+  @@index([status])
+}
+
+model ConsentRecord {
+  id            String    @id @default(uuid())
+  userId        String
+  purpose       String    // "contact_sharing", "emergency_broadcast", "sms_alerts", "terms_and_privacy"
+  policyVersion String    @default("v2.4-2026")
+  isGranted     Boolean
+  grantedAt     DateTime  @default(now())
+  revokedAt     DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([policyVersion])
+}
+
+model Notification {
+  id               String   @id @default(uuid())
+  recipientId      String
+  notificationType String   // "referral_success", "system", "emergency_request", "security_alert"
+  title            String?
+  message          String
+  payload          Json?
+  isRead           Boolean  @default(false)
+  relatedEntity    String?
+  createdAt        DateTime @default(now())
+
+  recipient User @relation("UserNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model SupportTicket {
+  id        String   @id @default(uuid())
+  userId    String?
+  name      String
+  email     String
+  subject   String
+  message   String
+  category  String   @default("general") // "general", "medical", "technical", "feedback"
+  status    String   @default("open") // "open", "in_progress", "resolved", "closed"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([email])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("UserAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model OrganizationSettings {
+  id                   String   @id @default("default")
+  name                 String   @default("BloodBridge")
+  supportHelpline      String   @default("+1 (800) 555-BLOOD")
+  supportEmail         String   @default("support@bloodbridge.org")
+  emergencyUrgentLine  String   @default("+1 (800) 999-URGENT")
+  currentPolicyVersion String   @default("v2.4-2026")
+  referralRewardPoints Int      @default(50)
+  maintenanceMode      Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
+}

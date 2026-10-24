@@ -1,0 +1,49 @@
+import http from 'http';
+import { app } from './app.js';
+import { config } from './config/index.js';
+import { connectDatabase, disconnectDatabase } from './config/database.js';
+import { initSocketServer } from './sockets/socket.server.js';
+import { logger } from './shared/logger.js';
+
+const httpServer = http.createServer(app);
+
+// Attach Socket.IO to HTTP server
+initSocketServer(httpServer);
+
+async function startServer() {
+  try {
+    // Connect to PostgreSQL database via Prisma
+    await connectDatabase();
+
+    const PORT = config.port;
+    httpServer.listen(PORT, () => {
+      logger.info(`=======================================================`);
+      logger.info(`  BloodBridge Full-Stack Healthcare Platform Server   `);
+      logger.info(`  Tagline: Be a Donor. Be a Savior.                   `);
+      logger.info(`  REST API:      http://localhost:${PORT}/api/v1       `);
+      logger.info(`  Health Check:  http://localhost:${PORT}/health       `);
+      logger.info(`  Socket.IO:     ws://localhost:${PORT}                `);
+      logger.info(`  Database:      PostgreSQL via Prisma                `);
+      logger.info(`  Environment:   ${config.env}                         `);
+      logger.info(`=======================================================`);
+    });
+  } catch (error: any) {
+    logger.error('Failed to start server:', error.message);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+const shutdown = async (signal: string) => {
+  logger.info(`Received ${signal}. Initiating graceful server shutdown...`);
+  httpServer.close(async () => {
+    await disconnectDatabase();
+    logger.info('HTTP server and database connections closed. Process terminating cleanly.');
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+startServer();
