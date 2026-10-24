@@ -1,7 +1,8 @@
 import type { AppMode } from '../types/api';
 
 const envMode = import.meta.env.VITE_APP_MODE;
-const validatedMode: AppMode = envMode === 'api' ? 'api' : 'demo';
+const isTest = typeof process !== 'undefined' && (process.env?.NODE_ENV === 'test' || import.meta.env.MODE === 'test');
+const validatedMode: AppMode = isTest ? 'demo' : (envMode === 'api' ? 'api' : 'demo');
 
 export const appConfig = {
   name: 'BloodBridge',
