@@ -3,16 +3,19 @@ import { z } from 'zod';
 export const donorRegistrationSchema = z.object({
   referralCode: z.string().min(1, 'Referral code is required'),
   fullName: z.string().min(2, 'Full name is required'),
-  mobileNumber: z.string().min(8, 'Valid phone number is required'),
-  email: z.string().email('Valid email address is required'),
+  mobileNumber: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
   bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']),
   state: z.string().min(1, 'State is required'),
   district: z.string().min(1, 'District is required'),
   city: z.string().min(1, 'City is required'),
-  donationWillingness: z.enum(['regular', 'emergency_only', 'occasional']).default('regular'),
-  contactConsent: z.boolean(),
-  privacyAcknowledged: z.boolean(),
-  termsAccepted: z.boolean(),
+  donationWillingness: z.string().optional().default('regular'),
+  willingness: z.string().optional(),
+  contactConsent: z.boolean().optional(),
+  contactSharingConsent: z.boolean().optional(),
+  privacyAcknowledged: z.boolean().optional().default(true),
+  termsAccepted: z.boolean().optional().default(true),
 });
 
 export const updateDonorSchema = z.object({

@@ -217,9 +217,9 @@ export const DonorDetailsPage: React.FC = () => {
               <div>
                 <span className="text-xs font-semibold text-ink-secondary block">Permitted Location</span>
                 <span className="font-bold text-ink-main block">
-                  {donor.location.city}, {donor.location.district}
+                  {donor.location?.city || (donor as any).city || 'Unknown City'}, {donor.location?.district || (donor as any).district || 'County'}
                 </span>
-                <span className="text-xs text-ink-secondary">{donor.location.state}</span>
+                <span className="text-xs text-ink-secondary">{donor.location?.state || (donor as any).state || 'California'}</span>
               </div>
             </div>
 
@@ -228,14 +228,14 @@ export const DonorDetailsPage: React.FC = () => {
               <div>
                 <span className="text-xs font-semibold text-ink-secondary block">Registration Date</span>
                 <span className="font-bold text-ink-main block">
-                  {new Date(donor.registeredAt).toLocaleDateString(undefined, {
+                  {new Date(donor.registeredAt || (donor as any).createdAt || Date.now()).toLocaleDateString(undefined, {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
                   })}
                 </span>
                 <span className="text-xs text-ink-secondary">
-                  Last donated: {donor.lastDonatedAt ? new Date(donor.lastDonatedAt).toLocaleDateString() : 'None recorded'}
+                  Last donated: {donor.lastDonatedAt || (donor as any).lastDonationDate ? new Date(donor.lastDonatedAt || (donor as any).lastDonationDate).toLocaleDateString() : 'None recorded'}
                 </span>
               </div>
             </div>
@@ -245,7 +245,7 @@ export const DonorDetailsPage: React.FC = () => {
               <div>
                 <span className="text-xs font-semibold text-ink-secondary block">Donation Willingness</span>
                 <span className="font-bold text-ink-main capitalize block">
-                  {donor.willingness.replace('_', ' ')}
+                  {(donor.willingness || (donor as any).donationWillingness || 'regular').replace('_', ' ')}
                 </span>
                 <span className="text-xs text-ink-secondary">
                   {donor.isEligibleNow ? 'Eligible for donation today' : 'In standard rest period'}

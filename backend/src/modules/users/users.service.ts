@@ -43,25 +43,43 @@ export class UsersService {
         });
       }
 
-      if (input.city || input.state || input.district || input.bloodGroup || input.donationWillingness || input.isAvailable !== undefined) {
+      const city = input.city || input.location?.city;
+      const state = input.state || input.location?.state;
+      const district = input.district || input.location?.district;
+      const willingness = input.willingness || input.donationWillingness;
+      const isAvailable = input.emergencyAvailability !== undefined ? input.emergencyAvailability : input.isAvailable;
+
+      if (city || state || district || input.bloodGroup || willingness || isAvailable !== undefined) {
         await tx.donorProfile.upsert({
           where: { userId },
           create: {
             userId,
             bloodGroup: input.bloodGroup || 'O+',
-            city: input.city || 'Unknown City',
-            state: input.state || '',
-            district: input.district || '',
-            donationWillingness: input.donationWillingness || 'regular',
-            isAvailable: input.isAvailable !== undefined ? input.isAvailable : true,
+            city: city || 'Unknown City',
+            state: state || '',
+            district: district || '',
+            donationWillingness: willingness || 'regular',
+            isAvailable: isAvailable !== undefined ? isAvailable : true,
           },
           update: {
-            ...(input.city && { city: input.city }),
-            ...(input.state && { state: input.state }),
-            ...(input.district && { district: input.district }),
+            ...(city && { city }),
+            ...(state && { state }),
+            ...(district && { district }),
             ...(input.bloodGroup && { bloodGroup: input.bloodGroup }),
-            ...(input.donationWillingness && { donationWillingness: input.donationWillingness }),
-            ...(input.isAvailable !== undefined && { isAvailable: input.isAvailable }),
+            ...(willingness && { donationWillingness: willingness }),
+            ...(isAvailable !== undefined && { isAvailable }),
+          },
+        });
+      }
+
+      if (input.contactSharingConsent !== undefined) {
+        await tx.consentRecord.create({
+          data: {
+            userId,
+            purpose: 'contact_sharing',
+            policyVersion: 'v2.4-2026',
+            isGranted: input.contactSharingConsent,
+            revokedAt: input.contactSharingConsent ? null : new Date(),
           },
         });
       }
@@ -100,7 +118,7 @@ export class UsersService {
         action: 'ACCOUNT_DELETION_REQUESTED',
         entityType: 'User',
         entityId: userId,
-        details: { reason },
+        details: JSON.stringify({ reason }),
       },
     });
 

@@ -1,5 +1,14 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import type { User, AuthSession, LoginCredentials, RegisterInput } from '../types/auth';
+import type {
+  User,
+  AuthSession,
+  LoginCredentials,
+  RegisterInput,
+  SignInCredentials,
+  SignInResponse,
+  SignUpInput,
+  SignUpResponse,
+} from '../types/auth';
 import { authService } from '../services';
 import { appConfig } from '../constants/config';
 
@@ -10,6 +19,12 @@ interface AuthContextType {
   isAdmin: boolean;
   isLoading: boolean;
   isDemo: boolean;
+  signin: (credentials: SignInCredentials) => Promise<SignInResponse>;
+  signup: (input: SignUpInput) => Promise<SignUpResponse>;
+  verifyLoginOtp: (input: { email: string; code: string }) => Promise<AuthSession>;
+  resendLoginOtp: (input: { email: string }) => Promise<{ success: boolean; message: string }>;
+  verifyEmail: (input: { email: string; code: string }) => Promise<AuthSession>;
+  resendVerification: (input: { email: string }) => Promise<{ success: boolean; message: string }>;
   login: (credentials: LoginCredentials) => Promise<AuthSession>;
   loginAsDemoUser: () => Promise<AuthSession>;
   loginAsDemoAdmin: () => Promise<AuthSession>;
@@ -40,6 +55,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshSession();
   }, [refreshSession]);
 
+  const signin = async (credentials: SignInCredentials): Promise<SignInResponse> => {
+    setIsLoading(true);
+    try {
+      return await authService.signin(credentials);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signup = async (input: SignUpInput): Promise<SignUpResponse> => {
+    setIsLoading(true);
+    try {
+      return await authService.signup(input);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyLoginOtp = async (input: { email: string; code: string }): Promise<AuthSession> => {
+    setIsLoading(true);
+    try {
+      const sessionResult = await authService.verifyLoginOtp(input);
+      setSession(sessionResult);
+      return sessionResult;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendLoginOtp = async (input: { email: string }): Promise<{ success: boolean; message: string }> => {
+    return authService.resendLoginOtp(input);
+  };
+
+  const verifyEmail = async (input: { email: string; code: string }): Promise<AuthSession> => {
+    setIsLoading(true);
+    try {
+      const sessionResult = await authService.verifyEmail(input);
+      setSession(sessionResult);
+      return sessionResult;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendVerification = async (input: { email: string }): Promise<{ success: boolean; message: string }> => {
+    return authService.resendVerification(input);
+  };
+
   const login = async (credentials: LoginCredentials): Promise<AuthSession> => {
     setIsLoading(true);
     try {
@@ -52,11 +115,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginAsDemoUser = async (): Promise<AuthSession> => {
-    return login({ identifier: 'marcus.vance@example.org' });
+    return login({ identifier: 'marcus.vance@example.org', password: 'Password123!' });
   };
 
   const loginAsDemoAdmin = async (): Promise<AuthSession> => {
-    return login({ identifier: 'admin@bloodbridge.org' });
+    return login({ identifier: 'admin@bloodbridge.org', password: 'AdminPassword2026!' });
   };
 
   const register = async (input: RegisterInput): Promise<AuthSession> => {
@@ -93,6 +156,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         isLoading,
         isDemo: appConfig.isDemo,
+        signin,
+        signup,
+        verifyLoginOtp,
+        resendLoginOtp,
+        verifyEmail,
+        resendVerification,
         login,
         loginAsDemoUser,
         loginAsDemoAdmin,

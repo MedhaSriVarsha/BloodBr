@@ -11,6 +11,7 @@ router.get('/metrics', adminController.getMetrics);
 router.get('/dashboard', adminController.getMetrics);
 router.get('/users', adminController.listUsers);
 router.patch('/users/:id/status', adminController.updateUserStatus);
+router.put('/users/:id/status', adminController.updateUserStatus);
 router.get('/donors', adminController.listDonors);
 router.patch('/donors/:id', adminController.updateDonorRecord);
 router.get('/referrals', adminController.listReferrals);

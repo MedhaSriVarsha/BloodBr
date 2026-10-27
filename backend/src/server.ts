@@ -12,18 +12,18 @@ initSocketServer(httpServer);
 
 async function startServer() {
   try {
-    // Connect to PostgreSQL database via Prisma
+    // Connect to database via Prisma
     await connectDatabase();
 
     const PORT = config.port;
     httpServer.listen(PORT, () => {
       logger.info(`=======================================================`);
-      logger.info(`  BloodBridge Full-Stack Healthcare Platform Server   `);
+      logger.info(`  BloodConnect Full-Stack Healthcare Platform Server   `);
       logger.info(`  Tagline: Be a Donor. Be a Savior.                   `);
       logger.info(`  REST API:      http://localhost:${PORT}/api/v1       `);
       logger.info(`  Health Check:  http://localhost:${PORT}/health       `);
       logger.info(`  Socket.IO:     ws://localhost:${PORT}                `);
-      logger.info(`  Database:      PostgreSQL via Prisma                `);
+      logger.info(`  Database:      Prisma ORM (Online)                  `);
       logger.info(`  Environment:   ${config.env}                         `);
       logger.info(`=======================================================`);
     });

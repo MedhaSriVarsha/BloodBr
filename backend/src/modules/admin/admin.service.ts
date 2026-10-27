@@ -96,6 +96,7 @@ export class AdminService {
     }));
 
     return {
+      data: items,
       items,
       total,
       page,
@@ -105,19 +106,31 @@ export class AdminService {
   }
 
   async updateUserStatus(userId: string, status: string, adminId?: string) {
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: { status },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { status },
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        actorId: adminId || null,
-        action: 'UPDATE_USER_STATUS',
-        entityType: 'User',
-        entityId: userId,
-        details: { newStatus: status },
-      },
+      // If suspended, immediately revoke all active refresh tokens for the user
+      if (status === 'suspended') {
+        await tx.refreshToken.updateMany({
+          where: { userId, isRevoked: false },
+          data: { isRevoked: true },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorId: adminId || null,
+          action: status === 'suspended' ? 'SUSPEND_USER' : 'REACTIVATE_USER',
+          entityType: 'User',
+          entityId: userId,
+          details: JSON.stringify({ newStatus: status }),
+        },
+      });
+
+      return user;
     });
 
     emitAdminEvent('admin:dashboard:updated', { userId, status });
@@ -178,6 +191,7 @@ export class AdminService {
     }));
 
     return {
+      data: items,
       items,
       total,
       page,
@@ -265,6 +279,7 @@ export class AdminService {
     }));
 
     return {
+      data: items,
       items,
       total,
       page,
@@ -289,7 +304,7 @@ export class AdminService {
         action: 'TOGGLE_REFERRAL_CODE',
         entityType: 'Referral',
         entityId: referralId,
-        details: { isActive, code: updated.referralCode },
+        details: JSON.stringify({ isActive, code: updated.referralCode }),
       },
     });
 
@@ -336,6 +351,7 @@ export class AdminService {
     }));
 
     return {
+      data: items,
       items,
       total,
       page,

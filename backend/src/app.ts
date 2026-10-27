@@ -59,9 +59,9 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: 'BloodBridge Full-Stack Platform API',
+    service: 'BloodBridge / BloodConnect Full-Stack Platform API',
     version: '1.0.0-prod',
-    database: 'PostgreSQL 16 (Online)',
+    database: 'Prisma ORM (Online)',
   });
 });
 

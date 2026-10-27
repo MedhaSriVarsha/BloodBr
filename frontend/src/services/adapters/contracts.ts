@@ -7,6 +7,10 @@ import type {
   VerifyOtpInput,
   ForgotPasswordInput,
   ResetPasswordInput,
+  SignInCredentials,
+  SignInResponse,
+  SignUpInput,
+  SignUpResponse,
 } from '../../types/auth';
 import type {
   DonorSummary,
@@ -36,12 +40,21 @@ import type {
 } from '../../types/admin';
 
 export interface AuthService {
+  signin(credentials: SignInCredentials): Promise<SignInResponse>;
+  signup(input: SignUpInput): Promise<SignUpResponse>;
+  verifyLoginOtp(input: { email: string; code: string }): Promise<AuthSession>;
+  resendLoginOtp(input: { email: string }): Promise<{ success: boolean; message: string }>;
+  verifyEmail(input: { email: string; code: string }): Promise<AuthSession>;
+  resendVerification(input: { email: string }): Promise<{ success: boolean; message: string }>;
+
   login(credentials: LoginCredentials): Promise<AuthSession>;
   register(input: RegisterInput): Promise<AuthSession>;
   verifyOtp(input: VerifyOtpInput): Promise<boolean>;
-  requestOtp(phone: string): Promise<{ success: boolean; message: string }>;
+  requestOtp(identifier: string): Promise<{ success: boolean; message: string }>;
   forgotPassword(input: ForgotPasswordInput): Promise<{ success: boolean; message: string }>;
+  verifyResetToken(token: string): Promise<{ valid: boolean; email?: string; message: string }>;
   resetPassword(input: ResetPasswordInput): Promise<{ success: boolean; message: string }>;
+  changePassword(input: { currentPassword: string; newPassword: string }): Promise<{ success: boolean; message: string }>;
   getCurrentSession(): Promise<AuthSession | null>;
   logout(): Promise<void>;
 }

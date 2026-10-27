@@ -9,7 +9,15 @@ import { ENDPOINTS } from '../../api/endpoints';
 
 export class HttpReferralService implements ReferralService {
   async validateReferralCode(code: string): Promise<ReferralCodeValidation> {
-    return apiClient.get<ReferralCodeValidation>(ENDPOINTS.VALIDATE_CODE(code));
+    const res = await apiClient.get<any>(ENDPOINTS.VALIDATE_CODE(code));
+    return {
+      isValid: Boolean(res.isValid ?? res.valid),
+      code: res.code || code,
+      referrerName: res.referrerName,
+      canDiscloseReferrer: Boolean(res.canDiscloseReferrer ?? true),
+      message: res.message,
+      isExpired: Boolean(res.isExpired),
+    };
   }
 
   async getReferralStats(): Promise<ReferralStats> {

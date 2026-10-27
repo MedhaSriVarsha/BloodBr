@@ -158,8 +158,8 @@ export const PrivacySettingsPage: React.FC = () => {
               <div>
                 <h2 className="text-base font-bold text-ink-main">Active Consent Preferences</h2>
                 <p className="text-xs text-ink-secondary">
-                  Under Policy Version {preferences.activePolicyVersion} &bull; Last updated:{' '}
-                  {new Date(preferences.lastUpdated).toLocaleDateString()}
+                  Under Policy Version {preferences.activePolicyVersion || 'v2.4-2026'} &bull; Last updated:{' '}
+                  {new Date(preferences.lastUpdated || Date.now()).toLocaleDateString()}
                 </p>
               </div>
             </CardHeader>
@@ -231,39 +231,45 @@ export const PrivacySettingsPage: React.FC = () => {
 
             <CardContent className="p-0">
               <div className="divide-y divide-line-border text-xs">
-                {preferences.history.map((item) => (
-                  <div key={item.id} className="p-4 flex items-start justify-between gap-3 hover:bg-gray-50/60">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className={`font-bold capitalize px-2 py-0.5 rounded text-[10px] ${
-                            item.action === 'granted'
-                              ? 'bg-emerald-50 text-status-success'
-                              : item.action === 'withdrawn'
-                              ? 'bg-red-50 text-status-error'
-                              : 'bg-blue-50 text-blue-700'
-                          }`}
-                        >
-                          {item.action}
-                        </span>
-                        <span className="font-mono text-ink-muted">
-                          Policy {item.policyVersion}
-                        </span>
+                {(preferences.history && preferences.history.length > 0) ? (
+                  preferences.history.map((item) => (
+                    <div key={item.id} className="p-4 flex items-start justify-between gap-3 hover:bg-gray-50/60">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={`font-bold capitalize px-2 py-0.5 rounded text-[10px] ${
+                              item.action === 'granted'
+                                ? 'bg-emerald-50 text-status-success'
+                                : item.action === 'withdrawn'
+                                ? 'bg-red-50 text-status-error'
+                                : 'bg-blue-50 text-blue-700'
+                            }`}
+                          >
+                            {item.action}
+                          </span>
+                          <span className="font-mono text-ink-muted">
+                            Policy {item.policyVersion}
+                          </span>
+                        </div>
+                        <p className="text-ink-main font-medium">{item.purpose}</p>
                       </div>
-                      <p className="text-ink-main font-medium">{item.purpose}</p>
-                    </div>
 
-                    <div className="text-right text-ink-secondary flex-shrink-0">
-                      <div className="flex items-center justify-end space-x-1">
-                        <Clock className="w-3 h-3 text-ink-muted" />
-                        <span>{new Date(item.timestamp).toLocaleDateString()}</span>
+                      <div className="text-right text-ink-secondary flex-shrink-0">
+                        <div className="flex items-center justify-end space-x-1">
+                          <Clock className="w-3 h-3 text-ink-muted" />
+                          <span>{new Date(item.timestamp).toLocaleDateString()}</span>
+                        </div>
+                        <span className="text-[10px] text-ink-muted block mt-0.5">
+                          {item.ipAddressMasked}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-ink-muted block mt-0.5">
-                        {item.ipAddressMasked}
-                      </span>
                     </div>
+                  ))
+                ) : (
+                  <div className="p-6 text-center text-xs text-ink-secondary">
+                    No explicit modifications recorded yet. All permissions are secured under Policy {preferences.activePolicyVersion || 'v2.4-2026'}.
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>

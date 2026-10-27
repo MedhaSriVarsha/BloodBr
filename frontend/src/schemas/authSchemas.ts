@@ -1,5 +1,42 @@
 import { z } from 'zod';
 
+export const signInSchema = z.object({
+  email: z.string().min(1, 'Email address is required.').email('Please enter a valid email address.'),
+  password: z.string().min(1, 'Password is required.'),
+});
+
+export type SignInFormData = z.infer<typeof signInSchema>;
+
+export const signUpSchema = z
+  .object({
+    username: z
+      .string()
+      .min(3, 'Username must be at least 3 characters.')
+      .max(30, 'Username must not exceed 30 characters.')
+      .regex(/^[a-zA-Z0-9_.-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens.'),
+    dateOfBirth: z
+      .string()
+      .min(1, 'Date of birth is required.')
+      .refine((val) => {
+        const d = new Date(val);
+        return !isNaN(d.getTime()) && d < new Date();
+      }, 'Please enter a valid date of birth in the past.'),
+    email: z.string().min(1, 'Email address is required.').email('Please enter a valid email address.'),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters long.')
+      .regex(/[A-Za-z]/, 'Password must contain at least one letter.')
+      .regex(/[0-9]/, 'Password must contain at least one number.'),
+    confirmPassword: z.string().min(8, 'Please confirm your password.'),
+    termsAccepted: z.boolean().optional().default(true),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match.',
+    path: ['confirmPassword'],
+  });
+
+export type SignUpFormData = z.infer<typeof signUpSchema>;
+
 export const loginSchema = z.object({
   identifier: z
     .string()
@@ -17,11 +54,13 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 export const registerSchema = z
   .object({
     name: z.string().min(2, 'Full name must be at least 2 characters.'),
+    email: z.string().min(1, 'Please enter your email address.').email('Please enter a valid email address.'),
     phone: z
       .string()
       .min(7, 'Please enter a valid phone number.')
-      .regex(/^[\d\s+\-()]{7,20}$/, 'Invalid phone number format.'),
-    email: z.string().email('Please enter a valid email address.').optional().or(z.literal('')),
+      .regex(/^[\d\s+\-()]{7,20}$/, 'Invalid phone number format.')
+      .optional()
+      .or(z.literal('')),
     password: z.string().min(8, 'Password must be at least 8 characters long.'),
     confirmPassword: z.string().min(8, 'Please confirm your password.'),
     termsAccepted: z.boolean().refine((val) => val === true, {
@@ -56,7 +95,7 @@ export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 export const resetPasswordSchema = z
   .object({
-    code: z.string().length(6, 'Enter the 6-digit verification code.'),
+    token: z.string().min(1, 'Reset token is required.').optional().or(z.literal('')),
     newPassword: z.string().min(8, 'New password must be at least 8 characters long.'),
     confirmPassword: z.string().min(8, 'Please confirm your new password.'),
   })
@@ -66,3 +105,16 @@ export const resetPasswordSchema = z
   });
 
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required.'),
+    newPassword: z.string().min(8, 'New password must be at least 8 characters long.'),
+    confirmPassword: z.string().min(8, 'Please confirm your new password.'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match.',
+    path: ['confirmPassword'],
+  });
+
+export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;

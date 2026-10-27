@@ -43,9 +43,9 @@ export const ForgotPasswordPage: React.FC = () => {
           <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center mb-2 shadow-sm">
             <KeyRound className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-bold text-ink-main tracking-tight">Reset Password</h1>
+          <h1 className="text-2xl font-bold text-ink-main tracking-tight">Forgot Password</h1>
           <p className="text-xs sm:text-sm text-ink-secondary">
-            Enter your registered email or phone to receive simulated recovery instructions.
+            Enter your registered email address to receive secure password recovery instructions.
           </p>
         </div>
 
@@ -55,16 +55,19 @@ export const ForgotPasswordPage: React.FC = () => {
           <div className="space-y-4 text-center py-4">
             <CheckCircle2 className="w-12 h-12 text-status-success mx-auto" />
             <h3 className="text-base font-bold text-ink-main">Recovery Link Dispatched</h3>
-            <p className="text-xs text-ink-secondary bg-gray-50 p-3 rounded-lg border border-line-border">
+            <p className="text-xs text-ink-secondary bg-gray-50 p-4 rounded-lg border border-line-border leading-relaxed">
               {successInfo}
+            </p>
+            <p className="text-xs text-ink-secondary">
+              Check your email inbox or spam folder for the secure reset link. The link expires in 15 minutes.
             </p>
             <div className="pt-2">
               <Button
-                variant="primary"
+                variant="secondary"
                 className="w-full justify-center"
-                onClick={() => navigate('/auth/reset-password', { state: { identifier: 'marcus.vance@example.org' } })}
+                onClick={() => navigate('/auth/login')}
               >
-                Proceed to Reset Password
+                Return to Sign In
               </Button>
             </div>
           </div>

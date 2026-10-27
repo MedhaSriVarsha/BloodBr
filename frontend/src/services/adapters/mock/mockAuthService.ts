@@ -6,20 +6,67 @@ import type {
   VerifyOtpInput,
   ForgotPasswordInput,
   ResetPasswordInput,
+  SignInCredentials,
+  SignInResponse,
+  SignUpInput,
+  SignUpResponse,
 } from '../../../types/auth';
 import { mockStore, delay } from './mockStore';
 
 export class MockAuthService implements AuthService {
+  async signin(credentials: SignInCredentials): Promise<SignInResponse> {
+    await delay(250);
+    return {
+      success: true,
+      requiresOtp: true,
+      email: credentials.email,
+      expiresInSeconds: 300,
+      resendCooldownSeconds: 60,
+      message: 'Login credentials verified. Single-use OTP code generated.',
+    };
+  }
+
+  async signup(input: SignUpInput): Promise<SignUpResponse> {
+    await delay(300);
+    return {
+      success: true,
+      requiresVerification: true,
+      email: input.email,
+      username: input.username,
+      message: 'Account created. Verification code sent.',
+    };
+  }
+
+  async verifyLoginOtp(input: { email: string; code: string }): Promise<AuthSession> {
+    await delay(200);
+    return this.login({ identifier: input.email, password: 'Password123!' });
+  }
+
+  async resendLoginOtp(input: { email: string }): Promise<{ success: boolean; message: string }> {
+    await delay(200);
+    return { success: true, message: `New login OTP sent to ${input.email}` };
+  }
+
+  async verifyEmail(input: { email: string; code: string }): Promise<AuthSession> {
+    await delay(200);
+    return this.login({ identifier: input.email, password: 'Password123!' });
+  }
+
+  async resendVerification(input: { email: string }): Promise<{ success: boolean; message: string }> {
+    await delay(200);
+    return { success: true, message: `New verification code sent to ${input.email}` };
+  }
   async login(credentials: LoginCredentials): Promise<AuthSession> {
     await delay(300);
 
-    const isIdentifierAdmin = credentials.identifier.toLowerCase().includes('admin');
+    const identifier = credentials.identifier || credentials.email || 'marcus.vance@example.org';
+    const isIdentifierAdmin = identifier.toLowerCase().includes('admin');
     const user = isIdentifierAdmin ? mockStore.adminUser : (mockStore.currentUser || {
       id: 'usr_demo_custom',
       name: 'Demo Donor',
-      phone: credentials.identifier.includes('@') ? '+1 (555) 019-2834' : credentials.identifier,
-      email: credentials.identifier.includes('@') ? credentials.identifier : 'demo.donor@bloodbridge.org',
-      role: 'donor',
+      phone: identifier.includes('@') ? '+1 (555) 019-2834' : identifier,
+      email: identifier.includes('@') ? identifier : 'demo.donor@bloodbridge.org',
+      role: 'donor' as const,
       referralCode: 'SAVIOR-DEMO',
       createdAt: new Date().toISOString(),
       isVerified: true,
@@ -43,7 +90,7 @@ export class MockAuthService implements AuthService {
     const newUser = {
       id: `usr_${Date.now()}`,
       name: input.name,
-      phone: input.phone,
+      phone: input.phone || '',
       email: input.email,
       role: 'donor' as const,
       referralCode: `SAVIOR-${input.name.split(' ')[0].toUpperCase()}${Math.floor(1000 + Math.random() * 9000)}`,
@@ -66,7 +113,8 @@ export class MockAuthService implements AuthService {
   async verifyOtp(input: VerifyOtpInput): Promise<boolean> {
     await delay(250);
     // In demo mode, accept standard '123456' or any 6-digit code
-    if (input.code.length === 6) {
+    const code = input.code || input.otp;
+    if (code && code.length === 6) {
       if (mockStore.currentUser) {
         mockStore.currentUser.isVerified = true;
       }
@@ -78,11 +126,11 @@ export class MockAuthService implements AuthService {
     };
   }
 
-  async requestOtp(phone: string): Promise<{ success: boolean; message: string }> {
+  async requestOtp(target: string): Promise<{ success: boolean; message: string }> {
     await delay(200);
     return {
       success: true,
-      message: `[Demo Mode] Simulated OTP code (123456) generated for ${phone}. No real SMS was transmitted.`,
+      message: `Verification code (123456) dispatched to ${target}. Enter it to complete verification.`,
     };
   }
 
@@ -90,7 +138,16 @@ export class MockAuthService implements AuthService {
     await delay(250);
     return {
       success: true,
-      message: `[Demo Mode] Simulated password recovery link generated for ${input.identifier}. No real email sent.`,
+      message: `Simulated password recovery link generated for ${input.email || input.identifier}.`,
+    };
+  }
+
+  async verifyResetToken(token: string): Promise<{ valid: boolean; email?: string; message: string }> {
+    await delay(150);
+    return {
+      valid: true,
+      email: 'm***s@example.org',
+      message: 'Token is valid.',
     };
   }
 
@@ -99,6 +156,14 @@ export class MockAuthService implements AuthService {
     return {
       success: true,
       message: 'Password reset simulation successful. You may now log in with your updated credentials.',
+    };
+  }
+
+  async changePassword(input: { currentPassword: string; newPassword: string }): Promise<{ success: boolean; message: string }> {
+    await delay(200);
+    return {
+      success: true,
+      message: 'Password updated successfully.',
     };
   }
 

@@ -13,10 +13,13 @@ import { ErrorBanner } from '../../components/ui/ErrorBanner';
 export const VerifyOtpPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const phone = (location.state as { phone?: string })?.phone || '+1 (555) 019-2834';
+  const stateData = location.state as { email?: string; phone?: string; identifier?: string } | undefined;
+  const email = stateData?.email || (stateData?.identifier?.includes('@') ? stateData.identifier : '');
+  const phone = stateData?.phone || (!stateData?.identifier?.includes('@') ? stateData?.identifier : '');
+  const displayIdentifier = email || phone || 'your registered contact';
 
   const [otpError, setOtpError] = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState<number>(30);
+  const [resendCooldown, setResendCooldown] = useState<number>(60);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
@@ -36,14 +39,18 @@ export const VerifyOtpPage: React.FC = () => {
   } = useForm<VerifyOtpFormData>({
     resolver: zodResolver(verifyOtpSchema),
     defaultValues: {
-      code: '123456', // Pre-fill with demo code for effortless testing
+      code: '',
     },
   });
 
   const onSubmit = async (data: VerifyOtpFormData) => {
     setOtpError(null);
     try {
-      await authService.verifyOtp({ phone, code: data.code });
+      await authService.verifyOtp({
+        email: email || undefined,
+        phone: phone || undefined,
+        code: data.code,
+      });
       setIsSuccess(true);
       setTimeout(() => {
         navigate('/app/dashboard');
@@ -57,12 +64,11 @@ export const VerifyOtpPage: React.FC = () => {
     if (resendCooldown > 0) return;
     setOtpError(null);
     try {
-      const res = await authService.requestOtp(phone);
+      const res = await authService.requestOtp(email || phone || displayIdentifier);
       setResendNotice(res.message);
-      setResendCooldown(30);
-      setValue('code', '123456');
+      setResendCooldown(60);
     } catch (err: unknown) {
-      setOtpError((err as { message?: string })?.message || 'Failed to dispatch simulated code.');
+      setOtpError((err as { message?: string })?.message || 'Failed to dispatch verification code.');
     }
   };
 
@@ -73,20 +79,17 @@ export const VerifyOtpPage: React.FC = () => {
           <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center mb-2 shadow-sm">
             <ShieldCheck className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-bold text-ink-main tracking-tight">Verify Mobile Number</h1>
+          <h1 className="text-2xl font-bold text-ink-main tracking-tight">Verify Your Email</h1>
           <p className="text-xs text-ink-secondary">
-            Simulated dispatch for <strong className="text-ink-main">{phone}</strong>
+            A 6-digit verification code was sent to <strong className="text-ink-main">{email || displayIdentifier}</strong>
           </p>
         </div>
 
-        {/* Explicit Demo Disclaimer as required by prompt */}
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex items-start space-x-2">
-          <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+        {/* Demo Helper Banner */}
+        <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2">
+          <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <span className="font-bold block">Simulated Verification Notice:</span>
-            <span>
-              This is a development demonstration. No real SMS has been transmitted and no real carrier verification has occurred. You can enter any 6-digit number or use the default <strong>123456</strong>.
-            </span>
+            <span className="font-semibold">Verification Code:</span> Check your inbox for the OTP. In Demo Mode, you can also enter <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold text-amber-800">123456</code> to verify immediately.
           </div>
         </div>
 
@@ -101,7 +104,7 @@ export const VerifyOtpPage: React.FC = () => {
         {isSuccess ? (
           <div className="py-6 text-center space-y-2 animate-in fade-in">
             <CheckCircle2 className="w-12 h-12 text-status-success mx-auto" />
-            <h3 className="text-base font-bold text-ink-main">Verification Confirmed!</h3>
+            <h3 className="text-base font-bold text-ink-main">Email Verified Successfully!</h3>
             <p className="text-xs text-ink-secondary">Redirecting to your savior dashboard...</p>
           </div>
         ) : (
@@ -124,11 +127,11 @@ export const VerifyOtpPage: React.FC = () => {
               isLoading={isSubmitting}
               className="w-full justify-center shadow-sm"
             >
-              Confirm &amp; Complete Verification
+              Verify Code &amp; Continue
             </Button>
 
             <div className="flex items-center justify-between text-xs text-ink-secondary pt-2">
-              <span>Didn&apos;t receive code?</span>
+              <span>Didn&apos;t receive email?</span>
               <button
                 type="button"
                 onClick={handleResend}
@@ -136,14 +139,14 @@ export const VerifyOtpPage: React.FC = () => {
                 className="font-semibold text-brand-600 hover:text-brand-700 disabled:opacity-40 disabled:pointer-events-none inline-flex items-center min-h-[44px] px-2 rounded"
               >
                 <RotateCw className="w-3 h-3 mr-1" />
-                {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend Simulated OTP'}
+                {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend Email OTP'}
               </button>
             </div>
           </form>
         )}
 
         <div className="pt-2 text-center text-xs text-ink-secondary border-t border-line-border">
-          Incorrect phone number?{' '}
+          Wrong email address?{' '}
           <Link to="/auth/register" className="font-semibold text-brand-600 hover:text-brand-700 underline">
             Edit Details
           </Link>

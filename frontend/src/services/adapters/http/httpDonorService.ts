@@ -29,11 +29,44 @@ export class HttpDonorService implements DonorService {
   }
 
   async getDonorById(id: string): Promise<DonorDetails> {
-    return apiClient.get<DonorDetails>(ENDPOINTS.DONOR_BY_ID(id));
+    const res = await apiClient.get<any>(ENDPOINTS.DONOR_BY_ID(id));
+    return {
+      id: res.id,
+      name: res.name || res.fullName || 'Anonymous Donor',
+      bloodGroup: res.bloodGroup,
+      location: res.location || {
+        city: res.city || 'Unknown City',
+        state: res.state || 'California',
+        district: res.district || 'County',
+      },
+      status: res.status || (res.isAvailable ? 'active' : 'unavailable'),
+      willingness: res.willingness || res.donationWillingness || 'regular',
+      registeredAt: res.registeredAt || res.createdAt || new Date().toISOString(),
+      referredByCode: res.referredByCode,
+      lastDonatedAt: res.lastDonatedAt || res.lastDonationDate,
+      isEligibleNow: res.isEligibleNow ?? res.isAvailable ?? true,
+      email: res.email,
+      canAccessContact: Boolean(res.canAccessContact),
+      contactNumber: res.contactNumber || res.mobileNumber,
+      contactUnavailableReason: res.contactUnavailableReason,
+      contactSharingConsentGranted: Boolean(res.contactSharingConsentGranted),
+      notes: res.notes,
+      emergencyAvailability: res.emergencyAvailability ?? res.isAvailable ?? true,
+      totalDonationsCount: res.totalDonationsCount ?? res.totalDonations ?? 0,
+    };
   }
 
   async registerDonor(input: DonorRegistrationInput): Promise<DonorRegistrationResult> {
-    return apiClient.post<DonorRegistrationResult>(ENDPOINTS.REGISTER_DONOR, input);
+    const payload = {
+      ...input,
+      mobileNumber: input.phone || (input as any).mobileNumber,
+      phone: input.phone || (input as any).mobileNumber,
+      contactConsent: input.contactSharingConsent ?? (input as any).contactConsent ?? true,
+      contactSharingConsent: input.contactSharingConsent ?? (input as any).contactConsent ?? true,
+      donationWillingness: input.willingness || (input as any).donationWillingness || 'regular',
+      willingness: input.willingness || (input as any).donationWillingness || 'regular',
+    };
+    return apiClient.post<DonorRegistrationResult>(ENDPOINTS.REGISTER_DONOR, payload);
   }
 
   async updateDonor(id: string, input: Partial<DonorDetails>): Promise<DonorDetails> {

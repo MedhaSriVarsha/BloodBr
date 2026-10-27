@@ -19,15 +19,50 @@ export interface AuthSession {
 }
 
 export interface LoginCredentials {
-  identifier: string; // phone or email
+  identifier?: string;
+  email?: string;
   password?: string;
   otp?: string;
 }
 
+export interface SignInCredentials {
+  email: string;
+  password: string;
+}
+
+export interface SignInResponse {
+  success: boolean;
+  requiresOtp?: boolean;
+  requiresEmailVerification?: boolean;
+  email: string;
+  expiresInSeconds?: number;
+  resendCooldownSeconds?: number;
+  message: string;
+}
+
+export interface SignUpInput {
+  username: string;
+  dateOfBirth: string;
+  email: string;
+  password: string;
+  confirmPassword?: string;
+  termsAccepted?: boolean;
+}
+
+export interface SignUpResponse {
+  success: boolean;
+  requiresVerification: boolean;
+  email: string;
+  username?: string;
+  age?: number;
+  isEligibleDonor?: boolean;
+  message: string;
+}
+
 export interface RegisterInput {
   name: string;
-  phone: string;
-  email?: string;
+  email: string;
+  phone?: string;
   password?: string;
   termsAccepted: boolean;
   privacyAcknowledged: boolean;
@@ -35,17 +70,22 @@ export interface RegisterInput {
 }
 
 export interface VerifyOtpInput {
-  phone: string;
-  code: string;
+  phone?: string;
+  email?: string;
+  code?: string;
+  otp?: string;
+  purpose?: string;
 }
 
 export interface ForgotPasswordInput {
-  identifier: string;
+  identifier?: string;
+  email?: string;
 }
 
 export interface ResetPasswordInput {
-  identifier: string;
-  code: string;
+  token?: string;
+  identifier?: string;
+  code?: string;
   newPassword: string;
 }
 

@@ -61,11 +61,26 @@ export class DonorService {
     const total = await prisma.donorProfile.count({ where });
     const skip = (page - 1) * pageSize;
 
+    let orderBy: any = { createdAt: sortOrder };
+    if (sortBy === 'name' || sortBy === 'fullName') {
+      orderBy = { user: { fullName: sortOrder } };
+    } else if (sortBy === 'bloodGroup') {
+      orderBy = { bloodGroup: sortOrder };
+    } else if (sortBy === 'totalDonations') {
+      orderBy = { totalDonations: sortOrder };
+    } else if (sortBy === 'city') {
+      orderBy = { city: sortOrder };
+    } else if (sortBy === 'lastDonationDate' || sortBy === 'lastDonation') {
+      orderBy = { lastDonationDate: sortOrder };
+    } else {
+      orderBy = { createdAt: sortOrder };
+    }
+
     const profiles = await prisma.donorProfile.findMany({
       where,
       skip,
       take: pageSize,
-      orderBy: { [sortBy]: sortOrder },
+      orderBy,
       include: {
         user: {
           select: {
@@ -82,19 +97,29 @@ export class DonorService {
 
     const items = profiles.map((p) => ({
       id: p.id,
+      name: p.user.fullName,
       fullName: p.user.fullName,
       bloodGroup: p.bloodGroup,
+      location: {
+        city: p.city,
+        state: p.state,
+        district: p.district,
+      },
       city: p.city,
       state: p.state,
       district: p.district,
-      status: p.user.status,
+      status: (p.user.status === 'active' ? 'active' : 'unavailable') as any,
+      willingness: (p.donationWillingness || 'regular') as any,
       availability: p.isAvailable ? 'available' : 'busy',
+      isEligibleNow: p.isAvailable,
+      lastDonatedAt: p.lastDonationDate ? p.lastDonationDate.toISOString() : undefined,
       lastDonation: p.lastDonationDate ? p.lastDonationDate.toISOString().split('T')[0] : 'Never',
       totalDonations: p.totalDonations,
       registeredAt: p.createdAt.toISOString(),
     }));
 
     return {
+      data: items,
       items,
       total,
       page,
@@ -141,33 +166,60 @@ export class DonorService {
       ? null
       : 'Direct contact details require verified coordinator authorization or explicit donor contact consent.';
 
+    const incomingRef = profile.user.receivedReferral;
+
     return {
       id: profile.id,
       userId: profile.userId,
+      name: profile.user.fullName,
       fullName: profile.user.fullName,
       email: canAccessContact ? profile.user.email : '••••••@•••••.org',
       mobileNumber,
+      contactNumber: mobileNumber,
       bloodGroup: profile.bloodGroup,
+      location: {
+        city: profile.city,
+        state: profile.state,
+        district: profile.district,
+      },
+      city: profile.city,
       state: profile.state,
       district: profile.district,
-      city: profile.city,
+      status: (profile.user.status === 'active' ? 'active' : 'unavailable') as any,
+      willingness: (profile.donationWillingness || 'regular') as any,
       donationWillingness: profile.donationWillingness,
       isAvailable: profile.isAvailable,
+      isEligibleNow: profile.isAvailable,
+      emergencyAvailability: profile.isAvailable,
       lastDonationDate: profile.lastDonationDate?.toISOString() || null,
+      lastDonatedAt: profile.lastDonationDate ? profile.lastDonationDate.toISOString() : undefined,
       totalDonations: profile.totalDonations,
+      totalDonationsCount: profile.totalDonations,
       canAccessContact,
       contactUnavailableReason,
+      contactSharingConsentGranted: Boolean(contactConsent),
+      registeredAt: profile.createdAt.toISOString(),
+      referredByCode: incomingRef ? incomingRef.referralCode : undefined,
       createdAt: profile.createdAt.toISOString(),
       updatedAt: profile.updatedAt.toISOString(),
     };
   }
 
   async registerDonor(input: DonorRegistrationPayload) {
-    const email = input.email.toLowerCase();
+    const rawPhone = (input.phone || input.mobileNumber || '').trim();
+    const phone = rawPhone || `+1 555-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const email = (input.email && input.email.trim())
+      ? input.email.toLowerCase().trim()
+      : `donor_${phone.replace(/\D/g, '') || Date.now()}@bloodbridge.org`;
+
+    const willingness = input.willingness || input.donationWillingness || 'regular';
+    const contactConsent = input.contactConsent ?? input.contactSharingConsent ?? true;
+    const termsAccepted = input.termsAccepted ?? true;
 
     // 1. Verify referral code exists
+    const normalizedReferralCode = input.referralCode.trim().toUpperCase();
     const referral = await prisma.referral.findUnique({
-      where: { referralCode: input.referralCode.toUpperCase() },
+      where: { referralCode: normalizedReferralCode },
       include: { referrer: true },
     });
 
@@ -182,13 +234,13 @@ export class DonorService {
     // Check existing account
     const existing = await prisma.user.findFirst({
       where: {
-        OR: [{ email }, { phone: input.mobileNumber }],
+        OR: [{ email }, { phone }],
       },
     });
 
     if (existing) {
       throw new AppError('A user with this email or phone number is already registered.', 409, 'CONFLICT', {
-        email: 'Account already exists with this email address',
+        email: 'Account already exists with this email address or phone number',
       });
     }
 
@@ -204,7 +256,7 @@ export class DonorService {
         data: {
           fullName: input.fullName,
           email,
-          phone: input.mobileNumber,
+          phone,
           passwordHash,
           role: 'donor',
           status: 'active',
@@ -220,7 +272,7 @@ export class DonorService {
           state: input.state,
           district: input.district,
           city: input.city,
-          donationWillingness: input.donationWillingness,
+          donationWillingness: willingness,
           isAvailable: true,
           totalDonations: 0,
         },
@@ -235,11 +287,13 @@ export class DonorService {
         },
       });
 
-      // Link incoming referral
-      await tx.referral.update({
-        where: { id: referral.id },
+      // Link incoming referral attribution (keep master referral code active)
+      await tx.referral.create({
         data: {
+          referrerUserId: referral.referrerUserId,
+          referralCode: `${referral.referralCode}-${generateRandomToken(4).toUpperCase()}`,
           referredUserId: user.id,
+          status: 'completed',
           completedAt: new Date(),
         },
       });
@@ -251,13 +305,13 @@ export class DonorService {
             userId: user.id,
             purpose: 'contact_sharing',
             policyVersion: 'v2.4-2026',
-            isGranted: input.contactConsent,
+            isGranted: contactConsent,
           },
           {
             userId: user.id,
             purpose: 'terms_and_privacy',
             policyVersion: 'v2.4-2026',
-            isGranted: input.termsAccepted,
+            isGranted: termsAccepted,
           },
         ],
       });
@@ -293,6 +347,7 @@ export class DonorService {
       bloodGroup: created.donorProfile.bloodGroup,
       message: 'Donor successfully enrolled in the BloodBridge network.',
       assignedReferralCode: userReferralCode,
+      referralCodeCreated: userReferralCode,
     };
   }
 

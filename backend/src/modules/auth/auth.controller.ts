@@ -2,9 +2,74 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from './auth.service.js';
 
 export class AuthController {
+  async signin(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.signin({
+        ...req.body,
+        ipAddress: req.ip,
+      });
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifyLoginOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.verifyLoginOtp(req.body);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resendLoginOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.resendLoginOtp({
+        ...req.body,
+        ipAddress: req.ip,
+      });
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async signup(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.signup(req.body);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifyEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.verifyEmail(req.body);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resendVerification(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.resendVerification(req.body);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async login(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await authService.login(req.body);
+      const email = req.body.email || req.body.identifier;
+      const result = await authService.signin({
+        ...req.body,
+        email,
+        ipAddress: req.ip,
+      });
       res.json(result);
     } catch (error) {
       next(error);
@@ -49,9 +114,31 @@ export class AuthController {
     }
   }
 
+  async verifyResetToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const token = (req.query.token as string) || (req.body.token as string) || '';
+      const result = await authService.verifyResetToken(token);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async resetPassword(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await authService.resetPassword(req.body);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async changePassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Authentication required' });
+      }
+      const result = await authService.changePassword(req.user.userId, req.body);
       res.json(result);
     } catch (error) {
       next(error);

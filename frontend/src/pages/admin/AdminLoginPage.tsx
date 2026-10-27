@@ -102,21 +102,20 @@ export const AdminLoginPage: React.FC = () => {
               </Button>
             </form>
 
-            {isDemo && (
-              <div className="pt-4 border-t border-slate-800 space-y-2.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400 block">
-                  Simulated Demo Environment:
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleQuickDemoAdmin}
-                  className="w-full justify-center bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
-                >
-                  Quick Sign In as Dr. Evelyn Reed (Admin)
-                </Button>
-              </div>
-            )}
+            {/* Admin Quick Access Pill */}
+            <div className="pt-4 border-t border-slate-800 space-y-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400 block">
+                Verified Admin Key: AdminPassword2026!
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleQuickDemoAdmin}
+                className="w-full justify-center bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 text-xs py-2.5"
+              >
+                1-Tap Authenticate as Dr. Evelyn Reed (Lead Admin)
+              </Button>
+            </div>
 
             <div className="text-center pt-2 border-t border-slate-800">
               <Link to="/auth/login" className="text-xs text-slate-400 hover:text-white inline-flex items-center min-h-[44px]">

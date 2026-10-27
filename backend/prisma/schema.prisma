@@ -3,13 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
   id              String    @id @default(uuid())
-  fullName        String
+  username        String?   @unique
+  fullName        String?
+  dateOfBirth     DateTime?
   email           String    @unique
   phone           String?   @unique
   passwordHash    String?
@@ -156,7 +158,7 @@ model Notification {
   notificationType String   // "referral_success", "system", "emergency_request", "security_alert"
   title            String?
   message          String
-  payload          Json?
+  payload          String?
   isRead           Boolean  @default(false)
   relatedEntity    String?
   createdAt        DateTime @default(now())
@@ -193,7 +195,7 @@ model AuditLog {
   action     String
   entityType String
   entityId   String?
-  details    Json?
+  details    String?
   ipAddress  String?
   createdAt  DateTime @default(now())
 

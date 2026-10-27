@@ -41,3 +41,6 @@ pgsql/
 postgres-data/
 *.sqlite
 *.sqlite-journal
+*.db
+*.db-journal
+dev.db

@@ -15,8 +15,10 @@ export class ReferralService {
 
     if (!referral) {
       return {
+        isValid: false,
         valid: false,
         code: normalizedCode,
+        canDiscloseReferrer: false,
         referrerName: 'Unknown Inviter',
         message: 'This referral code does not exist or may have been typed incorrectly.',
       };
@@ -24,18 +26,23 @@ export class ReferralService {
 
     if (referral.status !== 'active') {
       return {
+        isValid: false,
         valid: false,
         code: normalizedCode,
-        referrerName: referral.referrer.fullName,
+        isExpired: referral.status === 'expired' || referral.status === 'revoked',
+        canDiscloseReferrer: false,
+        referrerName: referral.referrer ? referral.referrer.fullName : 'Inviter',
         message: 'This invitation code is no longer active.',
       };
     }
 
     return {
+      isValid: true,
       valid: true,
       code: referral.referralCode,
-      referrerName: referral.referrer.fullName,
-      message: `Invitation confirmed. You were invited by ${referral.referrer.fullName}.`,
+      canDiscloseReferrer: true,
+      referrerName: referral.referrer ? referral.referrer.fullName : 'Verified Community Member',
+      message: `Invitation confirmed. You were invited by ${referral.referrer ? referral.referrer.fullName : 'a verified savior'}.`,
     };
   }
 

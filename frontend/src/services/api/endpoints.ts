@@ -1,11 +1,22 @@
 export const ENDPOINTS = {
-  // Auth
+  // BloodConnect Auth
+  SIGNIN: '/auth/signin',
+  SIGNUP: '/auth/signup',
+  VERIFY_EMAIL: '/auth/verify-email',
+  RESEND_VERIFICATION: '/auth/resend-verification',
+  VERIFY_LOGIN_OTP: '/auth/verify-login-otp',
+  RESEND_LOGIN_OTP: '/auth/resend-login-otp',
+
+  // Backwards-Compatible Aliases
   LOGIN: '/auth/login',
   REGISTER: '/auth/register',
   VERIFY_OTP: '/auth/verify-otp',
   REQUEST_OTP: '/auth/request-otp',
   FORGOT_PASSWORD: '/auth/forgot-password',
+  VERIFY_RESET_TOKEN: (token: string) => `/auth/verify-reset-token?token=${encodeURIComponent(token)}`,
   RESET_PASSWORD: '/auth/reset-password',
+  CHANGE_PASSWORD: '/auth/change-password',
+  GOOGLE_AUTH: '/auth/google',
   ME: '/auth/me',
   LOGOUT: '/auth/logout',
 

@@ -6,7 +6,15 @@ import { ENDPOINTS } from '../../api/endpoints';
 
 export class HttpConsentService implements ConsentService {
   async getConsentPreferences(): Promise<UserConsentPreferences> {
-    return apiClient.get<UserConsentPreferences>(ENDPOINTS.CONSENT_PREFERENCES);
+    const res = await apiClient.get<any>(ENDPOINTS.CONSENT_PREFERENCES);
+    return {
+      contactSharingAllowed: Boolean(res.contactSharingAllowed),
+      emergencyBroadcastAllowed: Boolean(res.emergencyBroadcastAllowed ?? true),
+      smsNotificationsAllowed: Boolean(res.smsNotificationsAllowed ?? true),
+      lastUpdated: res.lastUpdated || new Date().toISOString(),
+      activePolicyVersion: res.activePolicyVersion || 'v2.4-2026',
+      history: Array.isArray(res.history) ? res.history : [],
+    };
   }
 
   async updateConsent(update: {
@@ -14,7 +22,15 @@ export class HttpConsentService implements ConsentService {
     emergencyBroadcastAllowed?: boolean;
     smsNotificationsAllowed?: boolean;
   }): Promise<UserConsentPreferences> {
-    return apiClient.patch<UserConsentPreferences>(ENDPOINTS.CONSENT_PREFERENCES, update);
+    const res = await apiClient.patch<any>(ENDPOINTS.CONSENT_PREFERENCES, update);
+    return {
+      contactSharingAllowed: Boolean(res.contactSharingAllowed),
+      emergencyBroadcastAllowed: Boolean(res.emergencyBroadcastAllowed ?? true),
+      smsNotificationsAllowed: Boolean(res.smsNotificationsAllowed ?? true),
+      lastUpdated: res.lastUpdated || new Date().toISOString(),
+      activePolicyVersion: res.activePolicyVersion || 'v2.4-2026',
+      history: Array.isArray(res.history) ? res.history : [],
+    };
   }
 
   async listConsentsAdmin(params: {

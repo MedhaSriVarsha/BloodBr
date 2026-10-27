@@ -23,11 +23,12 @@ async function main() {
   });
 
   // 2. Administrator User (Dr. Evelyn Reed)
-  const adminPasswordHash = await hashPassword('admin123');
+  const adminPasswordHash = await hashPassword('AdminPassword2026!');
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@bloodbridge.org' },
     update: {
       fullName: 'Dr. Evelyn Reed',
+      passwordHash: adminPasswordHash,
       role: 'admin',
       status: 'active',
       isEmailVerified: true,
@@ -45,11 +46,12 @@ async function main() {
   });
 
   // 3. Primary Donor & Referrer (Marcus Vance)
-  const donorPasswordHash = await hashPassword('password123');
+  const donorPasswordHash = await hashPassword('Password123!');
   const marcusUser = await prisma.user.upsert({
     where: { email: 'marcus.vance@example.org' },
     update: {
       fullName: 'Marcus Vance',
+      passwordHash: donorPasswordHash,
       role: 'donor',
       status: 'active',
       isEmailVerified: true,
@@ -86,10 +88,15 @@ async function main() {
   // Marcus's Referral Code
   await prisma.referral.upsert({
     where: { referralCode: 'SAVIOR-MV2026' },
-    update: { referrerUserId: marcusUser.id },
+    update: {
+      referrerUserId: marcusUser.id,
+      referredUserId: null,
+      status: 'active',
+    },
     create: {
       referrerUserId: marcusUser.id,
       referralCode: 'SAVIOR-MV2026',
+      referredUserId: null,
       status: 'active',
     },
   });
@@ -192,23 +199,22 @@ async function main() {
     });
 
     // Record consent
-    await prisma.consentRecord.createMany({
-      data: [
-        {
-          userId: user.id,
-          purpose: 'contact_sharing',
-          policyVersion: 'v2.4-2026',
-          isGranted: donor.contactConsent,
-        },
-        {
-          userId: user.id,
-          purpose: 'terms_and_privacy',
-          policyVersion: 'v2.4-2026',
-          isGranted: true,
-        },
-      ],
-      skipDuplicates: true,
-    });
+    for (const record of [
+      {
+        userId: user.id,
+        purpose: 'contact_sharing',
+        policyVersion: 'v2.4-2026',
+        isGranted: donor.contactConsent,
+      },
+      {
+        userId: user.id,
+        purpose: 'terms_and_privacy',
+        policyVersion: 'v2.4-2026',
+        isGranted: true,
+      },
+    ]) {
+      await prisma.consentRecord.create({ data: record });
+    }
 
     // Referral linkage
     const existingRef = await prisma.referral.findFirst({
@@ -225,29 +231,33 @@ async function main() {
           completedAt: new Date(),
         },
       });
+    } else if (existingRef.referrerUserId !== marcusUser.id) {
+      await prisma.referral.update({
+        where: { id: existingRef.id },
+        data: { referrerUserId: marcusUser.id },
+      });
     }
   }
 
   // 5. Initial Notifications for Marcus
-  await prisma.notification.createMany({
-    data: [
-      {
-        recipientId: marcusUser.id,
-        notificationType: 'referral_success',
-        title: 'Elena Rostova Joined Your Network',
-        message: 'Elena Rostova registered as a B+ blood donor using your invitation link.',
-        isRead: false,
-      },
-      {
-        recipientId: marcusUser.id,
-        notificationType: 'system',
-        title: 'Welcome to BloodBridge',
-        message: 'Thank you for stepping up to be a savior. Share your referral code to expand the donor circle.',
-        isRead: true,
-      },
-    ],
-    skipDuplicates: true,
-  });
+  for (const notif of [
+    {
+      recipientId: marcusUser.id,
+      notificationType: 'referral_success',
+      title: 'Elena Rostova Joined Your Network',
+      message: 'Elena Rostova registered as a B+ blood donor using your invitation link.',
+      isRead: false,
+    },
+    {
+      recipientId: marcusUser.id,
+      notificationType: 'system',
+      title: 'Welcome to BloodBridge',
+      message: 'Thank you for stepping up to be a savior. Share your referral code to expand the donor circle.',
+      isRead: true,
+    },
+  ]) {
+    await prisma.notification.create({ data: notif });
+  }
 
   // 6. Audit Log Entry
   await prisma.auditLog.create({
@@ -255,7 +265,7 @@ async function main() {
       actorId: adminUser.id,
       action: 'SYSTEM_SEED',
       entityType: 'System',
-      details: { message: 'Database initialized with verified healthcare identities.' },
+      details: JSON.stringify({ message: 'Database initialized with verified healthcare identities.' }),
     },
   });
 
