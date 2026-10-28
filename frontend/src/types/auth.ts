@@ -60,6 +60,15 @@ export interface SignUpResponse {
   message: string;
 }
 
+export interface SignupReferralInput {
+  referralCode: string;
+  fullName?: string;
+  name?: string;
+  phone?: string;
+  phoneNumber?: string;
+  bloodGroup?: string;
+}
+
 export interface RegisterInput {
   name: string;
   email: string;

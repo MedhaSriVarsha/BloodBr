@@ -2,6 +2,7 @@ export const ENDPOINTS = {
   // BloodConnect Auth
   SIGNIN: '/auth/signin',
   SIGNUP: '/auth/signup',
+  SIGNUP_REFERRAL: '/auth/signup-referral',
   VERIFY_EMAIL: '/auth/verify-email',
   RESEND_VERIFICATION: '/auth/resend-verification',
   VERIFY_LOGIN_OTP: '/auth/verify-login-otp',

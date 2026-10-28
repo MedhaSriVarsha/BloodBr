@@ -10,6 +10,7 @@ import type {
   SignInResponse,
   SignUpInput,
   SignUpResponse,
+  SignupReferralInput,
 } from '../../../types/auth';
 import { mockStore, delay } from './mockStore';
 
@@ -35,6 +36,33 @@ export class MockAuthService implements AuthService {
       username: input.username,
       message: 'Account created. Verification code sent.',
     };
+  }
+
+  async signupWithReferral(input: SignupReferralInput): Promise<AuthSession> {
+    await delay(300);
+    const name = input.fullName || input.name || 'Savior Friend';
+    const phone = input.phoneNumber || input.phone || '+1 (555) 234-5678';
+    const user = {
+      id: 'usr_ref_' + Math.random().toString(36).substring(7),
+      name,
+      username: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      phone,
+      email: `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}@bloodbridge.org`,
+      role: 'donor' as const,
+      referralCode: 'SAVIOR-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
+      createdAt: new Date().toISOString(),
+      isVerified: true,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+    };
+    const session = {
+      user,
+      token: 'mock-jwt-token-referral-' + Date.now(),
+      refreshToken: 'mock-refresh-token-referral-' + Date.now(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    mockStore.currentUser = session.user;
+    localStorage.setItem('bloodbridge_auth_token', session.token);
+    return session;
   }
 
   async verifyLoginOtp(input: { email: string; code: string }): Promise<AuthSession> {

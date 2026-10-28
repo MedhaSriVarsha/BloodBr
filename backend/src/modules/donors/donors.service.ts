@@ -36,11 +36,11 @@ export class DonorService {
     }
 
     if (state) {
-      where.state = { contains: state, mode: 'insensitive' };
+      where.state = { contains: state };
     }
 
     if (district) {
-      where.district = { contains: district, mode: 'insensitive' };
+      where.district = { contains: district };
     }
 
     if (status && status !== 'ALL') {
@@ -53,8 +53,8 @@ export class DonorService {
 
     if (search) {
       where.OR = [
-        { city: { contains: search, mode: 'insensitive' } },
-        { user: { fullName: { contains: search, mode: 'insensitive' } } },
+        { city: { contains: search } },
+        { user: { fullName: { contains: search } } },
       ];
     }
 

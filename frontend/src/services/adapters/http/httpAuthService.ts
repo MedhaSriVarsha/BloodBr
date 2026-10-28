@@ -10,6 +10,7 @@ import type {
   SignInResponse,
   SignUpInput,
   SignUpResponse,
+  SignupReferralInput,
 } from '../../../types/auth';
 import { apiClient } from '../../api/client';
 import { ENDPOINTS } from '../../api/endpoints';
@@ -21,6 +22,13 @@ export class HttpAuthService implements AuthService {
 
   async signup(input: SignUpInput): Promise<SignUpResponse> {
     return apiClient.post<SignUpResponse>(ENDPOINTS.SIGNUP, input);
+  }
+
+  async signupWithReferral(input: SignupReferralInput): Promise<AuthSession> {
+    const session = await apiClient.post<AuthSession>(ENDPOINTS.SIGNUP_REFERRAL, input);
+    apiClient.setToken(session.token);
+    localStorage.setItem('bloodbridge_auth_token', session.token);
+    return session;
   }
 
   async verifyLoginOtp(input: { email: string; code: string }): Promise<AuthSession> {

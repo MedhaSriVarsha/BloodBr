@@ -20,6 +20,8 @@ import {
   Clipboard,
   Gift,
   Sparkles,
+  Phone,
+  Droplet,
 } from 'lucide-react';
 import { signInSchema, signUpSchema, type SignInFormData, type SignUpFormData } from '../../schemas/authSchemas';
 import { useAuth } from '../../hooks/useAuth';
@@ -57,6 +59,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
   const {
     signin,
     signup,
+    signupWithReferral,
     verifyLoginOtp,
     resendLoginOtp,
     verifyEmail,
@@ -92,11 +95,15 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
   const [isResending, setIsResending] = useState<boolean>(false);
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
 
-  // Referral states
-  const [referralInput, setReferralInput] = useState<string>(codeFromQuery);
+  // Referral states - Basic details without OTP
+  const [referralInput, setReferralInput] = useState<string>(codeFromQuery || 'SAVIOR-MV2026');
+  const [referralFullName, setReferralFullName] = useState<string>('');
+  const [referralPhone, setReferralPhone] = useState<string>('');
+  const [referralBloodGroup, setReferralBloodGroup] = useState<string>('O+');
+  const [isJoiningWithReferral, setIsJoiningWithReferral] = useState<boolean>(false);
   const [isValidatingReferral, setIsValidatingReferral] = useState<boolean>(false);
   const [validatedReferral, setValidatedReferral] = useState<ReferralCodeValidation | null>(null);
-  const [appliedReferralCode, setAppliedReferralCode] = useState<string>(extractReferralCode(codeFromQuery));
+  const [appliedReferralCode, setAppliedReferralCode] = useState<string>(extractReferralCode(codeFromQuery || 'SAVIOR-MV2026'));
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/app/dashboard';
 
@@ -349,6 +356,52 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
       }
     } catch {
       // Clipboard API might be restricted by browser policy; user can manually paste
+    }
+  };
+
+  // Direct Referral Join (Name + Phone only, Zero OTP)
+  const handleDirectReferralJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = extractReferralCode(referralInput || appliedReferralCode || (validatedReferral?.code || ''));
+    if (!code) {
+      setAuthError('Please provide a valid referral code or invitation link.');
+      return;
+    }
+    if (!referralFullName.trim() || referralFullName.trim().length < 2) {
+      setAuthError('Please enter your full name (at least 2 characters).');
+      return;
+    }
+    const cleanDigits = referralPhone.replace(/\D/g, '');
+    if (!referralPhone.trim() || cleanDigits.length < 7) {
+      setAuthError('Please enter a valid phone number (at least 7 digits).');
+      return;
+    }
+
+    setAuthError(null);
+    setIsJoiningWithReferral(true);
+    try {
+      const session = await signupWithReferral({
+        referralCode: code,
+        fullName: referralFullName.trim(),
+        name: referralFullName.trim(),
+        phone: referralPhone.trim(),
+        phoneNumber: referralPhone.trim(),
+        bloodGroup: referralBloodGroup,
+      });
+
+      setSuccessNotice(`Welcome, ${session.user.name || 'Savior'}! Joined directly through invitation (No OTP required).`);
+      setTimeout(() => {
+        if (session.user.role === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          navigate(from, { replace: true });
+        }
+      }, 700);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Referral join failed. Please check your invitation code.';
+      setAuthError(msg);
+    } finally {
+      setIsJoiningWithReferral(false);
     }
   };
 
@@ -774,129 +827,159 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
               </form>
             )}
 
-            {/* TAB 3: JOIN VIA REFERRAL INVITATION */}
+            {/* TAB 3: JOIN VIA REFERRAL INVITATION (NO OTP - BASIC DETAILS ONLY) */}
             {activeTab === 'referral' && (
-              <div className="space-y-5">
-                <div className="text-center space-y-1.5">
+              <div className="space-y-4">
+                <div className="text-center space-y-1">
                   <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 mx-auto flex items-center justify-center shadow-inner">
                     <Gift className="w-5 h-5" />
                   </div>
                   <h2 className="text-lg font-bold text-ink-main">Join Through Referral Invitation</h2>
-                  <p className="text-xs text-ink-secondary max-w-xs mx-auto">
-                    Paste the invitation link or 10-character code sent to you by a verified savior or medical center.
+                  <p className="text-xs text-ink-secondary max-w-sm mx-auto">
+                    Invited by a verified savior? Provide your basic details to activate your account immediately—<strong>no email OTP challenge required</strong>.
                   </p>
                 </div>
 
-                <form onSubmit={handleReferralSubmit} className="space-y-3">
-                  <div className="space-y-1.5">
+                {/* Instant Verification Banner */}
+                <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-xl text-xs text-emerald-900 font-medium flex items-center gap-2.5">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div>
+                    <span className="font-bold text-emerald-800">Zero OTP Needed:</span> Verified referrals skip code challenges. Fill your basic contact details and join instantly.
+                  </div>
+                </div>
+
+                <form onSubmit={handleDirectReferralJoin} className="space-y-3.5">
+                  {/* Referral Code Field */}
+                  <div className="space-y-1">
                     <label htmlFor="referral-input" className="block text-xs font-semibold text-ink-main">
-                      Invitation Link or Referral Code
+                      Referral Code or Invitation Link
                     </label>
                     <div className="relative">
                       <input
                         id="referral-input"
                         type="text"
                         value={referralInput}
-                        onChange={(e) => setReferralInput(e.target.value)}
-                        placeholder="Paste link e.g. http://.../join/SAVIOR-MV2026 or code"
+                        onChange={(e) => {
+                          setReferralInput(e.target.value);
+                          setValidatedReferral(null);
+                        }}
+                        placeholder="e.g. SAVIOR-MV2026 or paste invite link"
                         className="block w-full rounded-lg border border-line-border bg-white px-3.5 py-2.5 pr-20 text-xs sm:text-sm text-ink-main placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
-                        autoFocus
+                        required
                       />
-                      <button
-                        type="button"
-                        onClick={handlePasteClipboard}
-                        className="absolute inset-y-1 right-1 px-2.5 bg-gray-100 hover:bg-gray-200 text-ink-secondary text-xs rounded-md font-medium flex items-center gap-1 transition-colors"
-                        title="Paste from clipboard"
-                      >
-                        <Clipboard className="w-3.5 h-3.5" />
-                        Paste
-                      </button>
+                      <div className="absolute inset-y-1 right-1 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={handlePasteClipboard}
+                          className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-ink-secondary text-[11px] rounded font-medium flex items-center gap-1 transition-colors"
+                          title="Paste from clipboard"
+                        >
+                          <Clipboard className="w-3 h-3" />
+                          Paste
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => runValidateReferral(referralInput)}
+                          disabled={isValidatingReferral || !referralInput.trim()}
+                          className="px-2 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 text-[11px] rounded font-semibold transition-colors disabled:opacity-50"
+                        >
+                          {isValidatingReferral ? 'Checking...' : 'Check'}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
+                  {/* Validated Referral Info Banner if available */}
+                  {validatedReferral && validatedReferral.isValid && (
+                    <div className="p-2.5 rounded-lg border border-emerald-300 bg-emerald-50 text-xs flex items-center justify-between text-emerald-800">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>
+                          Invited by: <strong>{validatedReferral.referrerName || 'Community Savior'}</strong> ({validatedReferral.code})
+                        </span>
+                      </div>
+                      <span className="text-[10px] bg-emerald-200/70 text-emerald-900 px-1.5 py-0.5 rounded font-mono font-bold">
+                        VERIFIED
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Basic Details: Name */}
+                  <Input
+                    label="Full Name"
+                    placeholder="e.g. Varsha Medha"
+                    value={referralFullName}
+                    onChange={(e) => setReferralFullName(e.target.value)}
+                    required
+                    leftIcon={<User className="w-4 h-4" />}
+                    helperText="Your name as it should appear in your savior donor profile."
+                  />
+
+                  {/* Basic Details: Phone Number */}
+                  <Input
+                    label="Phone Number"
+                    placeholder="e.g. +1 (555) 019-2834"
+                    value={referralPhone}
+                    onChange={(e) => setReferralPhone(e.target.value)}
+                    required
+                    leftIcon={<Phone className="w-4 h-4" />}
+                    helperText="Required for emergency critical blood shortage alerts."
+                  />
+
+                  {/* Basic Details: Blood Group */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-ink-main">
+                      Blood Group
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {(['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'] as const).map((bg) => (
+                        <button
+                          key={bg}
+                          type="button"
+                          onClick={() => setReferralBloodGroup(bg)}
+                          className={`py-1.5 px-2 text-xs font-bold rounded-lg border transition-all text-center ${
+                            referralBloodGroup === bg
+                              ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                              : 'bg-white text-ink-main border-line-border hover:border-brand-300 hover:bg-brand-50/50'
+                          }`}
+                        >
+                          {bg}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Submit Button - NO OTP NEEDED */}
                   <Button
                     type="submit"
                     variant="primary"
-                    size="md"
-                    isLoading={isValidatingReferral}
-                    className="w-full justify-center shadow-sm font-bold"
+                    size="lg"
+                    isLoading={isJoiningWithReferral}
+                    className="w-full justify-center shadow-md font-bold text-sm mt-2"
+                    rightIcon={<ArrowRight className="w-4 h-4" />}
                   >
-                    Validate &amp; Check Invitation
+                    Join Immediately (No OTP Required) &rarr;
                   </Button>
                 </form>
 
-                {/* Validated Referral Card */}
-                {validatedReferral && validatedReferral.isValid && (
-                  <div className="p-4 rounded-xl border-2 border-emerald-300 bg-emerald-50/80 space-y-3 animate-in fade-in">
-                    <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <span>Verified Savior Invitation Found!</span>
-                    </div>
-
-                    <div className="text-xs space-y-1 text-ink-main bg-white/80 p-3 rounded-lg border border-emerald-200 font-medium">
-                      <div>
-                        Referral Code: <strong className="font-mono text-emerald-700">{validatedReferral.code}</strong>
-                      </div>
-                      {validatedReferral.referrerName && (
-                        <div>
-                          Invited By: <strong className="text-ink-main">{validatedReferral.referrerName}</strong>
-                        </div>
-                      )}
-                      <div className="text-[11px] text-ink-secondary">
-                        Network: Community Emergency Blood Donor Circle
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pt-1">
-                      <Button
-                        type="button"
-                        variant="primary"
-                        size="md"
-                        onClick={() => {
-                          setActiveTab('signup');
-                          setSignUpValue('referralCode', validatedReferral.code);
-                        }}
-                        className="w-full justify-center shadow-md font-bold"
-                        rightIcon={<ArrowRight className="w-4 h-4" />}
-                      >
-                        Create Account with this Referral
-                      </Button>
-
-                      <div className="flex items-center justify-between text-xs pt-1 px-1">
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('signin')}
-                          className="font-semibold text-brand-600 hover:text-brand-700 underline"
-                        >
-                          Already have an account? Sign In &rarr;
-                        </button>
-
-                        <Link
-                          to={`/join/${validatedReferral.code}/register`}
-                          className="font-semibold text-ink-secondary hover:text-ink-main underline"
-                        >
-                          Full Donor Form &rarr;
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Demo Quick Paste Pill */}
-                <div className="pt-3 border-t border-line-border text-center">
-                  <span className="text-[11px] text-ink-secondary block mb-1.5">
-                    Don&apos;t have an invite link? Test with Marcus Vance&apos;s active circle:
+                {/* Demo Quick Test Pill */}
+                <div className="pt-3 border-t border-line-border text-center space-y-1.5">
+                  <span className="text-[11px] text-ink-secondary block">
+                    Need a test code? Join Marcus Vance&apos;s active circle:
                   </span>
                   <button
                     type="button"
                     onClick={() => {
                       setReferralInput('SAVIOR-MV2026');
+                      setAppliedReferralCode('SAVIOR-MV2026');
                       runValidateReferral('SAVIOR-MV2026');
+                      if (!referralFullName) setReferralFullName('Varsha Medha');
+                      if (!referralPhone) setReferralPhone('+1 (555) 019-2834');
                     }}
                     className="inline-flex items-center px-3 py-1.5 rounded-lg border border-brand-200 bg-brand-50 hover:bg-brand-100 text-xs font-mono font-bold text-brand-700 transition-colors gap-1.5"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-brand-500" />
-                    SAVIOR-MV2026 (1-Click Test)
+                    Auto-Fill Test Referral (SAVIOR-MV2026)
                   </button>
                 </div>
               </div>

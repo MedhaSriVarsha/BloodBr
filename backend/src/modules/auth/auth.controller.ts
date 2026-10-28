@@ -44,6 +44,15 @@ export class AuthController {
     }
   }
 
+  async signupWithReferral(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.signupWithReferral(req.body);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async verifyEmail(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await authService.verifyEmail(req.body);

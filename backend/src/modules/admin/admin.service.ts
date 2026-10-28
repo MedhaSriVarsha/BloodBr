@@ -70,8 +70,8 @@ export class AdminService {
     }
     if (search) {
       where.OR = [
-        { fullName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
+        { fullName: { contains: search } },
+        { email: { contains: search } },
       ];
     }
 
@@ -152,15 +152,15 @@ export class AdminService {
 
     const where: any = {};
     if (bloodGroup && bloodGroup !== 'ALL') where.bloodGroup = bloodGroup;
-    if (state) where.state = { contains: state, mode: 'insensitive' };
-    if (district) where.district = { contains: district, mode: 'insensitive' };
+    if (state) where.state = { contains: state };
+    if (district) where.district = { contains: district };
     if (status && status !== 'ALL') {
       where.isAvailable = status === 'active';
     }
     if (search) {
       where.OR = [
-        { city: { contains: search, mode: 'insensitive' } },
-        { user: { fullName: { contains: search, mode: 'insensitive' } } },
+        { city: { contains: search } },
+        { user: { fullName: { contains: search } } },
       ];
     }
 
@@ -249,8 +249,8 @@ export class AdminService {
     const where: any = {};
     if (search) {
       where.OR = [
-        { referralCode: { contains: search, mode: 'insensitive' } },
-        { referrer: { fullName: { contains: search, mode: 'insensitive' } } },
+        { referralCode: { contains: search } },
+        { referrer: { fullName: { contains: search } } },
       ];
     }
 

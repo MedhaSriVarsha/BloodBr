@@ -8,6 +8,7 @@ import type {
   SignInResponse,
   SignUpInput,
   SignUpResponse,
+  SignupReferralInput,
 } from '../types/auth';
 import { authService } from '../services';
 import { appConfig } from '../constants/config';
@@ -21,6 +22,7 @@ interface AuthContextType {
   isDemo: boolean;
   signin: (credentials: SignInCredentials) => Promise<SignInResponse>;
   signup: (input: SignUpInput) => Promise<SignUpResponse>;
+  signupWithReferral: (input: SignupReferralInput) => Promise<AuthSession>;
   verifyLoginOtp: (input: { email: string; code: string }) => Promise<AuthSession>;
   resendLoginOtp: (input: { email: string }) => Promise<{ success: boolean; message: string }>;
   verifyEmail: (input: { email: string; code: string }) => Promise<AuthSession>;
@@ -68,6 +70,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       return await authService.signup(input);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signupWithReferral = async (input: SignupReferralInput): Promise<AuthSession> => {
+    setIsLoading(true);
+    try {
+      const authResult = await authService.signupWithReferral(input);
+      setSession(authResult);
+      return authResult;
     } finally {
       setIsLoading(false);
     }
@@ -158,6 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isDemo: appConfig.isDemo,
         signin,
         signup,
+        signupWithReferral,
         verifyLoginOtp,
         resendLoginOtp,
         verifyEmail,

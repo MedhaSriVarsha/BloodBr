@@ -455,6 +455,195 @@ export class AuthService {
     };
   }
 
+  async signupWithReferral(input: {
+    referralCode: string;
+    name?: string;
+    fullName?: string;
+    phone?: string;
+    phoneNumber?: string;
+    bloodGroup?: string;
+    city?: string;
+    state?: string;
+    district?: string;
+  }) {
+    const rawCode = (input.referralCode || '').trim().toUpperCase();
+    const cleanName = (input.fullName || input.name || '').trim();
+    const cleanPhone = (input.phoneNumber || input.phone || '').trim();
+
+    if (!rawCode) {
+      throw new AppError('Referral invitation code is required.', 400, 'VALIDATION_FAILED');
+    }
+    if (!cleanName || cleanName.length < 2) {
+      throw new AppError('Full name is required (min 2 characters).', 400, 'VALIDATION_FAILED');
+    }
+    if (!cleanPhone || cleanPhone.length < 7) {
+      throw new AppError('Phone number is required (min 7 digits).', 400, 'VALIDATION_FAILED');
+    }
+
+    // 1. Verify referral exists
+    const referral = await prisma.referral.findUnique({
+      where: { referralCode: rawCode },
+      include: { referrer: true },
+    });
+
+    if (!referral) {
+      throw new AppError('Invalid or expired referral invitation code.', 400, 'INVALID_REFERRAL');
+    }
+
+    const safePhoneSuffix = cleanPhone.replace(/\D/g, '').slice(-4) || generateRandomToken(4);
+    const normalizedEmail = `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}_${safePhoneSuffix}@bloodbridge.org`;
+    const username = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 15) + '_' + generateRandomToken(4).toLowerCase();
+
+    // 2. Check if user already exists with this phone or email
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { phone: cleanPhone },
+          { email: normalizedEmail },
+        ],
+      },
+      include: { donorProfile: true },
+    });
+
+    if (existingUser) {
+      // User already registered: issue authenticated session directly
+      const accessToken = signAccessToken({
+        userId: existingUser.id,
+        email: existingUser.email,
+        role: existingUser.role,
+      });
+      const refreshTokenString = generateRandomToken(40);
+      await prisma.refreshToken.create({
+        data: {
+          userId: existingUser.id,
+          tokenHash: hashToken(refreshTokenString),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      return {
+        success: true,
+        requiresOtp: false,
+        requiresVerification: false,
+        message: `Welcome back, ${existingUser.fullName || existingUser.username}! Signed in via referral circle.`,
+        token: accessToken,
+        refreshToken: refreshTokenString,
+        user: {
+          id: existingUser.id,
+          name: existingUser.fullName || existingUser.username || 'Savior',
+          username: existingUser.username,
+          email: existingUser.email,
+          phone: existingUser.phone,
+          role: existingUser.role,
+          isVerified: true,
+          createdAt: existingUser.createdAt.toISOString(),
+        },
+      };
+    }
+
+    // 3. Create new user with isEmailVerified: true (NO OTP REQUIRED!)
+    const defaultPassword = 'Password123!';
+    const passwordHash = await hashPassword(defaultPassword);
+    const userReferralCode = 'SAVIOR-' + generateRandomToken(4).toUpperCase();
+
+    const newUser = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          username,
+          fullName: cleanName,
+          phone: cleanPhone,
+          email: normalizedEmail,
+          passwordHash,
+          role: 'donor',
+          status: 'active',
+          isEmailVerified: true,
+          emailVerifiedAt: new Date(),
+          dateOfBirth: new Date('2000-01-01'),
+        },
+      });
+
+      // Create donor profile
+      await tx.donorProfile.create({
+        data: {
+          userId: user.id,
+          bloodGroup: input.bloodGroup || 'O+',
+          state: input.state || 'California',
+          district: input.district || 'Los Angeles County',
+          city: input.city || 'Pasadena',
+          donationWillingness: 'regular',
+          isAvailable: true,
+          totalDonations: 0,
+        },
+      });
+
+      // User's own referral code
+      await tx.referral.create({
+        data: {
+          referrerUserId: user.id,
+          referralCode: userReferralCode,
+          status: 'active',
+        },
+      });
+
+      // Link referral attribution
+      if (referral.referrerUserId !== user.id) {
+        await tx.referral.create({
+          data: {
+            referrerUserId: referral.referrerUserId,
+            referralCode: `${referral.referralCode}-${generateRandomToken(4).toUpperCase()}`,
+            referredUserId: user.id,
+            status: 'completed',
+            completedAt: new Date(),
+          },
+        });
+      }
+
+      await tx.consentRecord.create({
+        data: {
+          userId: user.id,
+          purpose: 'terms_and_privacy',
+          policyVersion: 'v2.4-2026',
+          isGranted: true,
+        },
+      });
+
+      return user;
+    });
+
+    const accessToken = signAccessToken({
+      userId: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
+    });
+    const refreshTokenString = generateRandomToken(40);
+    await prisma.refreshToken.create({
+      data: {
+        userId: newUser.id,
+        tokenHash: hashToken(refreshTokenString),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    return {
+      success: true,
+      requiresOtp: false,
+      requiresVerification: false,
+      message: `Account activated through ${referral.referrer?.fullName || 'Savior Network'} invitation! Welcome to BloodConnect.`,
+      token: accessToken,
+      refreshToken: refreshTokenString,
+      user: {
+        id: newUser.id,
+        name: newUser.fullName,
+        username: newUser.username,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role,
+        isVerified: true,
+        createdAt: newUser.createdAt.toISOString(),
+      },
+    };
+  }
+
   async verifyEmail(input: { email: string; code: string }) {
     const email = input.email.toLowerCase().trim();
     const code = (input.code || '').trim();

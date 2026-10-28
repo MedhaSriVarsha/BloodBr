@@ -6,6 +6,7 @@ import { authLimiter } from '../../middleware/rateLimiter.middleware.js';
 import { requireAuth } from '../../middleware/auth.middleware.js';
 import {
   signupSchema,
+  signupReferralSchema,
   signinSchema,
   verifyLoginOtpSchema,
   resendLoginOtpSchema,
@@ -24,6 +25,8 @@ const router = Router();
 
 // BloodConnect Core Auth Endpoints
 router.post('/signup', authLimiter, validate(signupSchema), authController.signup);
+router.post('/signup-referral', authLimiter, validate(signupReferralSchema), authController.signupWithReferral);
+router.post('/referral-signup', authLimiter, validate(signupReferralSchema), authController.signupWithReferral);
 router.post('/verify-email', authLimiter, validate(verifyEmailSchema), authController.verifyEmail);
 router.post('/resend-verification', authLimiter, validate(resendVerificationSchema), authController.resendVerification);
 router.post('/signin', authLimiter, validate(signinSchema), authController.signin);

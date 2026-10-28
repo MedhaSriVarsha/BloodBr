@@ -34,6 +34,24 @@ export const signupSchema = z
     path: ['confirmPassword'],
   });
 
+export const signupReferralSchema = z.object({
+  referralCode: z.string().min(1, 'Referral invitation code is required'),
+  name: z.string().optional(),
+  fullName: z.string().optional(),
+  phone: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']).optional().default('O+'),
+  city: z.string().optional().default('Pasadena'),
+  state: z.string().optional().default('California'),
+  district: z.string().optional().default('Los Angeles County'),
+}).refine((data) => (data.name && data.name.trim().length >= 2) || (data.fullName && data.fullName.trim().length >= 2), {
+  message: 'Full name is required (min 2 characters)',
+  path: ['name'],
+}).refine((data) => (data.phone && data.phone.trim().length >= 7) || (data.phoneNumber && data.phoneNumber.trim().length >= 7), {
+  message: 'Phone number is required (min 7 digits)',
+  path: ['phone'],
+});
+
 export const signinSchema = z.object({
   email: z
     .string()
