@@ -16,9 +16,15 @@ import {
   AlertCircle,
   KeyRound,
   UserCheck,
+  Share2,
+  Clipboard,
+  Gift,
+  Sparkles,
 } from 'lucide-react';
 import { signInSchema, signUpSchema, type SignInFormData, type SignUpFormData } from '../../schemas/authSchemas';
 import { useAuth } from '../../hooks/useAuth';
+import { referralService } from '../../services';
+import type { ReferralCodeValidation } from '../../types/referral';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Checkbox } from '../../components/ui/Checkbox';
@@ -26,7 +32,25 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { ErrorBanner } from '../../components/ui/ErrorBanner';
 
 interface AuthLandingPageProps {
-  initialTab?: 'signin' | 'signup';
+  initialTab?: 'signin' | 'signup' | 'referral';
+}
+
+/**
+ * Extracts clean referral code from raw input (supports full URLs, paths, or raw codes)
+ * e.g. "http://localhost:5173/join/SAVIOR-MV2026?ref=1" -> "SAVIOR-MV2026"
+ * e.g. "/join/SAVIOR-MV2026" -> "SAVIOR-MV2026"
+ * e.g. "SAVIOR-MV2026" -> "SAVIOR-MV2026"
+ */
+function extractReferralCode(raw: string): string {
+  if (!raw) return '';
+  let str = raw.trim();
+  if (str.includes('/join/')) {
+    const parts = str.split('/join/');
+    str = parts[1] || '';
+  }
+  // Remove query params or trailing path segments
+  str = str.split(/[/?#]/)[0] || '';
+  return str.replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase();
 }
 
 export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = 'signin' }) => {
@@ -44,11 +68,20 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine initial tab from props or query param ?tab=signup / ?tab=signin
+  // Determine initial tab from props or query param ?tab=signup / ?tab=signin / ?tab=referral
   const queryParams = new URLSearchParams(location.search);
-  const tabFromQuery = queryParams.get('tab') === 'signup' ? 'signup' : queryParams.get('tab') === 'signin' ? 'signin' : initialTab;
+  const rawTab = queryParams.get('tab');
+  const codeFromQuery = queryParams.get('referral') || queryParams.get('ref') || queryParams.get('code') || '';
+  
+  const tabFromQuery = rawTab === 'signup' 
+    ? 'signup' 
+    : rawTab === 'referral' || Boolean(codeFromQuery)
+    ? 'referral' 
+    : rawTab === 'signin' 
+    ? 'signin' 
+    : initialTab;
 
-  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>(tabFromQuery);
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup' | 'referral'>(tabFromQuery);
   const [authStep, setAuthStep] = useState<'form' | 'login_otp' | 'email_verification'>('form');
   const [challengeEmail, setChallengeEmail] = useState<string>('');
   const [otpCode, setOtpCode] = useState<string>('');
@@ -58,6 +91,12 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
   const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
   const [isResending, setIsResending] = useState<boolean>(false);
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null);
+
+  // Referral states
+  const [referralInput, setReferralInput] = useState<string>(codeFromQuery);
+  const [isValidatingReferral, setIsValidatingReferral] = useState<boolean>(false);
+  const [validatedReferral, setValidatedReferral] = useState<ReferralCodeValidation | null>(null);
+  const [appliedReferralCode, setAppliedReferralCode] = useState<string>(extractReferralCode(codeFromQuery));
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/app/dashboard';
 
@@ -89,6 +128,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
     register: registerSignUp,
     handleSubmit: handleSignUpSubmit,
     watch: watchSignUp,
+    setValue: setSignUpValue,
     formState: { errors: signUpErrors, isSubmitting: isSignUpSubmitting },
   } = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
@@ -98,6 +138,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
       email: '',
       password: '',
       confirmPassword: '',
+      referralCode: appliedReferralCode,
       termsAccepted: true,
     },
   });
@@ -121,6 +162,13 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
     }
   }, [dobValue]);
 
+  // If query had referral code, validate on mount
+  useEffect(() => {
+    if (codeFromQuery) {
+      runValidateReferral(codeFromQuery);
+    }
+  }, [codeFromQuery]);
+
   // 1. Handle Sign In
   const onSignIn = async (data: SignInFormData) => {
     setAuthError(null);
@@ -134,17 +182,14 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
       setChallengeEmail(result.email || data.email.trim());
 
       if (result.requiresEmailVerification) {
-        // Step 3: Unverified account flow
         setAuthStep('email_verification');
         setResendCooldown(60);
         setSuccessNotice('Account not yet verified. An activation code has been dispatched to your email.');
       } else if (result.requiresOtp) {
-        // Step 4 & 5: Credentials valid -> Move to Login OTP challenge
         setAuthStep('login_otp');
         setResendCooldown(60);
         setSuccessNotice('Verification code dispatched. Please check your inbox.');
       } else {
-        // In case OTP was bypassed or session directly issued
         navigate(from, { replace: true });
       }
     } catch (err: unknown) {
@@ -164,6 +209,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
         email: data.email.trim(),
         password: data.password,
         confirmPassword: data.confirmPassword,
+        referralCode: data.referralCode || appliedReferralCode || undefined,
         termsAccepted: data.termsAccepted,
       });
 
@@ -256,6 +302,53 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
       setAuthError(msg);
     } finally {
       setIsResending(false);
+    }
+  };
+
+  // 5. Validate Referral Code / Invitation Link
+  const runValidateReferral = async (inputStr: string) => {
+    const cleanCode = extractReferralCode(inputStr);
+    if (!cleanCode) {
+      setAuthError('Please paste a valid referral invitation link or enter a referral code.');
+      return;
+    }
+
+    setAuthError(null);
+    setIsValidatingReferral(true);
+    setValidatedReferral(null);
+
+    try {
+      const result = await referralService.validateReferralCode(cleanCode);
+      if (result.isValid) {
+        setValidatedReferral(result);
+        setAppliedReferralCode(cleanCode);
+        setSignUpValue('referralCode', cleanCode);
+        setSuccessNotice(`Valid invitation from ${result.referrerName || 'Community Savior'}!`);
+      } else {
+        setAuthError(result.message || 'This referral code is invalid or has expired.');
+      }
+    } catch {
+      setAuthError('Unable to validate invitation code. Please check the link and try again.');
+    } finally {
+      setIsValidatingReferral(false);
+    }
+  };
+
+  const handleReferralSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    runValidateReferral(referralInput);
+  };
+
+  // Paste from clipboard handler
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setReferralInput(text);
+        runValidateReferral(text);
+      }
+    } catch {
+      // Clipboard API might be restricted by browser policy; user can manually paste
     }
   };
 
@@ -372,16 +465,16 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
                   }}
                   className="text-xs text-ink-secondary hover:text-brand-600 font-semibold"
                 >
-                  &larr; Return to {activeTab === 'signin' ? 'Sign In' : 'Sign Up'}
+                  &larr; Return to {activeTab === 'signin' ? 'Sign In' : activeTab === 'signup' ? 'Sign Up' : 'Referral Option'}
                 </button>
               </div>
             </form>
           </div>
         ) : (
-          /* Step: Form Selection (Sign In or Sign Up) */
+          /* Step: Form Selection (Sign In, Sign Up, or Referral Invitation) */
           <>
-            {/* Dual Options Tab Selector */}
-            <div className="flex rounded-xl bg-gray-100 p-1 text-sm font-semibold shadow-inner">
+            {/* 3 Options Tab Selector */}
+            <div className="flex rounded-xl bg-gray-100 p-1 text-xs sm:text-sm font-semibold shadow-inner gap-1">
               <button
                 type="button"
                 id="auth-tab-signin"
@@ -390,15 +483,16 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
                   setAuthError(null);
                   setSuccessNotice(null);
                 }}
-                className={`flex-1 py-2.5 text-center rounded-lg transition-all flex items-center justify-center gap-2 ${
+                className={`flex-1 py-2 px-1 text-center rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'signin'
                     ? 'bg-white text-brand-600 shadow-sm font-bold ring-1 ring-black/5'
                     : 'text-ink-secondary hover:text-ink-main'
                 }`}
               >
-                <UserCheck className="w-4 h-4" />
+                <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Sign In
               </button>
+
               <button
                 type="button"
                 id="auth-tab-signup"
@@ -407,14 +501,32 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
                   setAuthError(null);
                   setSuccessNotice(null);
                 }}
-                className={`flex-1 py-2.5 text-center rounded-lg transition-all flex items-center justify-center gap-2 ${
+                className={`flex-1 py-2 px-1 text-center rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'signup'
                     ? 'bg-white text-brand-600 shadow-sm font-bold ring-1 ring-black/5'
                     : 'text-ink-secondary hover:text-ink-main'
                 }`}
               >
-                <User className="w-4 h-4" />
+                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Sign Up
+              </button>
+
+              <button
+                type="button"
+                id="auth-tab-referral"
+                onClick={() => {
+                  setActiveTab('referral');
+                  setAuthError(null);
+                  setSuccessNotice(null);
+                }}
+                className={`flex-1 py-2 px-1 text-center rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === 'referral'
+                    ? 'bg-white text-brand-600 shadow-sm font-bold ring-1 ring-black/5'
+                    : 'text-ink-secondary hover:text-ink-main'
+                }`}
+              >
+                <Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
+                Referral
               </button>
             </div>
 
@@ -428,7 +540,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
             )}
 
             {/* TAB 1: SIGN IN */}
-            {activeTab === 'signin' ? (
+            {activeTab === 'signin' && (
               <form onSubmit={handleSignInSubmit(onSignIn)} className="space-y-4">
                 <Input
                   label="Registered Email Address"
@@ -473,8 +585,26 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
                   Sign In &amp; Send OTP
                 </Button>
 
+                {/* Quick Invitation Referral Callout */}
+                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900">
+                  <div className="flex items-center space-x-2">
+                    <Gift className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Have an invitation link or referral code?</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('referral');
+                      setAuthError(null);
+                    }}
+                    className="font-bold text-amber-800 hover:text-amber-900 underline ml-2"
+                  >
+                    Paste Here &rarr;
+                  </button>
+                </div>
+
                 {/* 1-Tap Credentials Pill for Convenience */}
-                <div className="pt-4 border-t border-line-border space-y-2.5">
+                <div className="pt-3 border-t border-line-border space-y-2.5">
                   <div className="flex items-center text-[11px] text-ink-secondary font-semibold uppercase tracking-wider text-amber-800">
                     <ShieldAlert className="w-3.5 h-3.5 mr-1 text-amber-600" />
                     Quick Test Credentials (1-Tap):
@@ -503,9 +633,34 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
                   </div>
                 </div>
               </form>
-            ) : (
-              /* TAB 2: SIGN UP */
+            )}
+
+            {/* TAB 2: SIGN UP */}
+            {activeTab === 'signup' && (
               <form onSubmit={handleSignUpSubmit(onSignUp)} className="space-y-4">
+                {/* Active referral badge if applied */}
+                {appliedReferralCode && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-900">
+                    <div className="flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>
+                        Invitation Attached: <strong className="font-mono">{appliedReferralCode}</strong>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedReferralCode('');
+                        setValidatedReferral(null);
+                        setSignUpValue('referralCode', '');
+                      }}
+                      className="text-[11px] text-emerald-700 hover:text-emerald-900 underline font-medium"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
                 <Input
                   label="Username"
                   placeholder="e.g. jordan_savior"
@@ -575,6 +730,18 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
                   />
                 </div>
 
+                {/* Optional Referral Code Input Field */}
+                {!appliedReferralCode && (
+                  <Input
+                    label="Invitation / Referral Code (Optional)"
+                    placeholder="e.g. SAVIOR-MV2026 or paste invite link"
+                    leftIcon={<Share2 className="w-4 h-4" />}
+                    helperText="Paste code or link if you were referred by an existing savior."
+                    error={signUpErrors.referralCode?.message}
+                    {...registerSignUp('referralCode')}
+                  />
+                )}
+
                 <div className="pt-2">
                   <Checkbox
                     label={
@@ -605,6 +772,134 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({ initialTab = '
                   Create Account &amp; Send OTP
                 </Button>
               </form>
+            )}
+
+            {/* TAB 3: JOIN VIA REFERRAL INVITATION */}
+            {activeTab === 'referral' && (
+              <div className="space-y-5">
+                <div className="text-center space-y-1.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 mx-auto flex items-center justify-center shadow-inner">
+                    <Gift className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-lg font-bold text-ink-main">Join Through Referral Invitation</h2>
+                  <p className="text-xs text-ink-secondary max-w-xs mx-auto">
+                    Paste the invitation link or 10-character code sent to you by a verified savior or medical center.
+                  </p>
+                </div>
+
+                <form onSubmit={handleReferralSubmit} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="referral-input" className="block text-xs font-semibold text-ink-main">
+                      Invitation Link or Referral Code
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="referral-input"
+                        type="text"
+                        value={referralInput}
+                        onChange={(e) => setReferralInput(e.target.value)}
+                        placeholder="Paste link e.g. http://.../join/SAVIOR-MV2026 or code"
+                        className="block w-full rounded-lg border border-line-border bg-white px-3.5 py-2.5 pr-20 text-xs sm:text-sm text-ink-main placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handlePasteClipboard}
+                        className="absolute inset-y-1 right-1 px-2.5 bg-gray-100 hover:bg-gray-200 text-ink-secondary text-xs rounded-md font-medium flex items-center gap-1 transition-colors"
+                        title="Paste from clipboard"
+                      >
+                        <Clipboard className="w-3.5 h-3.5" />
+                        Paste
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    isLoading={isValidatingReferral}
+                    className="w-full justify-center shadow-sm font-bold"
+                  >
+                    Validate &amp; Check Invitation
+                  </Button>
+                </form>
+
+                {/* Validated Referral Card */}
+                {validatedReferral && validatedReferral.isValid && (
+                  <div className="p-4 rounded-xl border-2 border-emerald-300 bg-emerald-50/80 space-y-3 animate-in fade-in">
+                    <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <span>Verified Savior Invitation Found!</span>
+                    </div>
+
+                    <div className="text-xs space-y-1 text-ink-main bg-white/80 p-3 rounded-lg border border-emerald-200 font-medium">
+                      <div>
+                        Referral Code: <strong className="font-mono text-emerald-700">{validatedReferral.code}</strong>
+                      </div>
+                      {validatedReferral.referrerName && (
+                        <div>
+                          Invited By: <strong className="text-ink-main">{validatedReferral.referrerName}</strong>
+                        </div>
+                      )}
+                      <div className="text-[11px] text-ink-secondary">
+                        Network: Community Emergency Blood Donor Circle
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="md"
+                        onClick={() => {
+                          setActiveTab('signup');
+                          setSignUpValue('referralCode', validatedReferral.code);
+                        }}
+                        className="w-full justify-center shadow-md font-bold"
+                        rightIcon={<ArrowRight className="w-4 h-4" />}
+                      >
+                        Create Account with this Referral
+                      </Button>
+
+                      <div className="flex items-center justify-between text-xs pt-1 px-1">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('signin')}
+                          className="font-semibold text-brand-600 hover:text-brand-700 underline"
+                        >
+                          Already have an account? Sign In &rarr;
+                        </button>
+
+                        <Link
+                          to={`/join/${validatedReferral.code}/register`}
+                          className="font-semibold text-ink-secondary hover:text-ink-main underline"
+                        >
+                          Full Donor Form &rarr;
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Demo Quick Paste Pill */}
+                <div className="pt-3 border-t border-line-border text-center">
+                  <span className="text-[11px] text-ink-secondary block mb-1.5">
+                    Don&apos;t have an invite link? Test with Marcus Vance&apos;s active circle:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReferralInput('SAVIOR-MV2026');
+                      runValidateReferral('SAVIOR-MV2026');
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-lg border border-brand-200 bg-brand-50 hover:bg-brand-100 text-xs font-mono font-bold text-brand-700 transition-colors gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-brand-500" />
+                    SAVIOR-MV2026 (1-Click Test)
+                  </button>
+                </div>
+              </div>
             )}
           </>
         )}

@@ -46,6 +46,7 @@ export interface SignUpInput {
   email: string;
   password: string;
   confirmPassword?: string;
+  referralCode?: string;
   termsAccepted?: boolean;
 }
 
