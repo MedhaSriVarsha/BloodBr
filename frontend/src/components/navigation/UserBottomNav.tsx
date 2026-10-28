@@ -1,13 +1,17 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, Share2, Bell, User } from 'lucide-react';
+import { useNotifications } from '../../hooks/useNotifications';
 
-export const UserBottomNav: React.FC<{ unreadCount?: number }> = ({ unreadCount = 2 }) => {
+export const UserBottomNav: React.FC<{ unreadCount?: number }> = ({ unreadCount }) => {
+  const { unreadCount: liveUnreadCount } = useNotifications();
+  const effectiveUnread = typeof unreadCount === 'number' ? unreadCount : liveUnreadCount;
+
   const navItems = [
     { label: 'Dashboard', to: '/app/dashboard', icon: LayoutDashboard },
     { label: 'Donors', to: '/app/donors', icon: Users },
     { label: 'Refer', to: '/app/referrals', icon: Share2 },
-    { label: 'Alerts', to: '/app/notifications', icon: Bell, badge: unreadCount },
+    { label: 'Alerts', to: '/app/notifications', icon: Bell, badge: effectiveUnread },
     { label: 'Profile', to: '/app/profile', icon: User },
   ];
 

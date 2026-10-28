@@ -10,7 +10,7 @@ import {
   ArrowRight,
   Filter,
 } from 'lucide-react';
-import { notificationService } from '../../services';
+import { useNotifications } from '../../hooks/useNotifications';
 import type { AppNotification } from '../../types/notification';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -19,55 +19,23 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorBanner } from '../../components/ui/ErrorBanner';
 
 export const NotificationsPage: React.FC = () => {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const {
+    notifications,
+    unreadCount,
+    isLoading: loading,
+    error: errorMsg,
+    refreshNotifications: loadNotifications,
+    markAsRead: handleMarkAsRead,
+    markAllAsRead: handleMarkAllAsRead,
+  } = useNotifications();
+
   const [filterType, setFilterType] = useState<string>('ALL');
-
-  const loadNotifications = async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const data = await notificationService.getNotifications();
-      setNotifications(data);
-    } catch (err: unknown) {
-      setErrorMsg((err as { message?: string })?.message || 'Failed to retrieve notifications.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      await notificationService.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    try {
-      await notificationService.markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const filteredNotifications = notifications.filter((n) => {
     if (filterType === 'ALL') return true;
     if (filterType === 'UNREAD') return !n.isRead;
     return n.type === filterType;
   });
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const getIconForType = (type: string) => {
     switch (type) {

@@ -3,11 +3,24 @@ import { emitToUser } from '../../sockets/socket.server.js';
 
 export class NotificationService {
   async getNotifications(userId: string) {
-    const notifications = await prisma.notification.findMany({
+    let notifications = await prisma.notification.findMany({
       where: { recipientId: userId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+
+    if (notifications.length === 0) {
+      const welcome = await prisma.notification.create({
+        data: {
+          recipientId: userId,
+          notificationType: 'system',
+          title: 'Welcome to BloodBridge Network!',
+          message: 'Your voluntary savior profile is active. You can view matching donation requests and share your referral invitation to expand the emergency circle.',
+          isRead: false,
+        },
+      });
+      notifications = [welcome];
+    }
 
     return notifications.map((n) => ({
       id: n.id,
@@ -15,8 +28,17 @@ export class NotificationService {
       type: n.notificationType,
       title: n.title || 'System Notification',
       message: n.message,
+      isRead: n.isRead,
       read: n.isRead,
+      createdAt: n.createdAt.toISOString(),
       timestamp: n.createdAt.toISOString(),
+      actionUrl:
+        n.notificationType === 'referral_success'
+          ? '/app/referrals'
+          : n.notificationType === 'emergency_request'
+          ? '/app/donors'
+          : '/app/dashboard',
+      emergencyUrgency: n.notificationType === 'emergency_request' ? 'critical' : undefined,
     }));
   }
 
@@ -53,7 +75,9 @@ export class NotificationService {
       type: notification.notificationType,
       title: notification.title,
       message: notification.message,
+      isRead: notification.isRead,
       read: notification.isRead,
+      createdAt: notification.createdAt.toISOString(),
       timestamp: notification.createdAt.toISOString(),
     });
 

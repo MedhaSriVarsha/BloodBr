@@ -15,10 +15,13 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotifications } from '../../hooks/useNotifications';
 import { ConfirmDialog } from '../feedback/ConfirmDialog';
 
-export const UserNavbar: React.FC<{ unreadCount?: number }> = ({ unreadCount = 2 }) => {
+export const UserNavbar: React.FC<{ unreadCount?: number }> = ({ unreadCount }) => {
   const { user, logout } = useAuth();
+  const { unreadCount: liveUnreadCount } = useNotifications();
+  const effectiveUnread = typeof unreadCount === 'number' ? unreadCount : liveUnreadCount;
   const location = useLocation();
   const navigate = useNavigate();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -28,7 +31,7 @@ export const UserNavbar: React.FC<{ unreadCount?: number }> = ({ unreadCount = 2
     { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
     { label: 'My Donors', href: '/app/donors', icon: Users },
     { label: 'Referrals', href: '/app/referrals', icon: Share2 },
-    { label: 'Notifications', href: '/app/notifications', icon: Bell, badge: unreadCount },
+    { label: 'Notifications', href: '/app/notifications', icon: Bell, badge: effectiveUnread },
   ];
 
   const handleConfirmLogout = async () => {
